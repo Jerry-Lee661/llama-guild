@@ -1,0 +1,22 @@
+[project]
+name = "llama-multimodel-mcp"
+version = "0.1.0"
+description = "MCP server exposing local llama-server / OpenAI-compatible model profiles, lifecycle, and inference debugging to coding agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "mcp>=1.29,<2",
+    "httpx>=0.27",
+    "psutil>=5.9",
+]
+
+[project.scripts]
+llama-multimodel-mcp = "llama_multimodel_mcp.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

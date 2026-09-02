@@ -1,0 +1,13 @@
+{
+  "_comment": "llama-multimodel-mcp configuration. Copy to ~/.llama-mm/config.json (or set LLAMA_MM_CONFIG). Every field is optional; defaults shown.",
+  "server_exe": "llama-server",
+  "host": "127.0.0.1",
+  "vram_budget_gb": 20,
+  "stats_enabled": true,
+  "stats_path": null,
+  "log_dir": null,
+  "profiles_file": null,
+  "env_amd_file": null,
+  "env_amd_aliases": {},
+  "rocm_smi_path": null
+}

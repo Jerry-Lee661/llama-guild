@@ -1,0 +1,55 @@
+{
+  "_comment": "Model profiles for llama-multimodel-mcp. Copy to ~/.llama-mm/profiles.json (or point config.profiles_file at it). 'tier' drives workflow routing: 'quality' = high-quality executor, 'bulk' = fast/rough executor. provider: 'llama-server' = full lifecycle (start/stop/bench/telemetry); 'openai-compatible' = inference + stats against a running server (LM Studio :1234, Ollama :11434/v1, vLLM, llama-swap, ...).",
+  "profiles": {
+    "code-quality": {
+      "provider": "llama-server",
+      "tier": "quality",
+      "exe": "llama-server",
+      "model": "/path/to/your-coder-model.gguf",
+      "draft_model": null,
+      "mmproj": null,
+      "port": 8081,
+      "ctx": 65536,
+      "weight_gb": 14.0,
+      "description": "High-quality coding executor (tune ctx/args to your VRAM)",
+      "args": {
+        "-ngl": "99",
+        "--flash-attn": "on",
+        "--cache-type-k": "q8_0",
+        "--cache-type-v": "q8_0",
+        "--n-predict": "8192",
+        "--temp": "0.6",
+        "--top-p": "0.95",
+        "--top-k": "20"
+      }
+    },
+    "bulk-fast": {
+      "provider": "llama-server",
+      "tier": "bulk",
+      "exe": "llama-server",
+      "model": "/path/to/your-fast-model.gguf",
+      "draft_model": null,
+      "mmproj": null,
+      "port": 8082,
+      "ctx": 32768,
+      "weight_gb": 12.0,
+      "description": "Fast/rough executor for mechanical batch work",
+      "args": {
+        "-ngl": "99",
+        "--flash-attn": "on",
+        "--cache-type-k": "q8_0",
+        "--cache-type-v": "q8_0",
+        "--n-predict": "4096",
+        "--temp": "0.7"
+      }
+    },
+    "lmstudio": {
+      "provider": "openai-compatible",
+      "tier": "quality",
+      "base_url": "http://127.0.0.1:1234",
+      "model_id": "your-loaded-model-id",
+      "description": "Running LM Studio / Ollama(/v1) / vLLM / llama-swap endpoint",
+      "args": {}
+    }
+  }
+}

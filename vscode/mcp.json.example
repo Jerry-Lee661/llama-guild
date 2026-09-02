@@ -1,0 +1,12 @@
+{
+  "_comment": "Copy to <your-repo>/.vscode/mcp.json (VS Code Copilot agent mode). Command = the python that has llama-multimodel-mcp installed.",
+  "servers": {
+    "llama-mm": {
+      "command": "python",
+      "args": ["-m", "llama_multimodel_mcp.server"],
+      "env": {
+        "LLAMA_MM_PROFILES": "/absolute/path/to/profiles.json"
+      }
+    }
+  }
+}

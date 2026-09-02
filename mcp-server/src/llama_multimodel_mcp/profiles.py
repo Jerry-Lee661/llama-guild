@@ -1,0 +1,121 @@
+"""Unified profile model: JSON profiles (primary) or optional .env-amd adapter."""
+
+from __future__ import annotations
+
+import json
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from . import config as config_mod
+
+
+@dataclass
+class Profile:
+    id: str
+    provider: str = "llama-server"          # llama-server | openai-compatible
+    tier: str = ""                          # quality | bulk | ""
+    exe: str = "llama-server"               # llama-server only
+    model: str = ""                         # gguf path, or model_id for openai-compatible
+    draft_model: str | None = None
+    mmproj: str | None = None
+    port: int | None = None
+    ctx: int | None = None
+    base_url: str | None = None             # openai-compatible
+    flags: dict = field(default_factory=dict)
+    raw_args: list[str] = field(default_factory=list)  # launch tokens after exe
+    description: str = ""
+    weight_gb: float | None = None
+    removed: bool = False
+    needs_rocm_path: bool = False
+    orphaned_flags: list[str] = field(default_factory=list)
+    line: int = 0
+
+
+def _from_json(pid: str, d: dict) -> Profile:
+    provider = d.get("provider", "llama-server")
+    args = d.get("args", {}) or {}
+    if isinstance(args, list):                       # verbatim token list
+        flags, raw = {}, list(args)
+        j = 0
+        while j < len(raw):
+            t = raw[j]
+            if t.startswith("-") and j + 1 < len(raw) and not raw[j + 1].startswith("-"):
+                flags[t] = raw[j + 1]
+                j += 2
+            else:
+                flags[t] = None
+                j += 1
+    else:                                            # flag -> value (null = boolean)
+        flags = dict(args)
+        raw = []
+        for k, v in flags.items():
+            raw += [k] if v is None else [k, str(v)]
+    port = d.get("port")
+    base_url = d.get("base_url")
+    if provider == "openai-compatible" and not base_url:
+        base_url = f"http://127.0.0.1:{port or 8080}"
+    if provider == "openai-compatible" and port is None and base_url:
+        try:
+            port = int(base_url.rstrip("/").rsplit(":", 1)[1])
+        except (IndexError, ValueError):
+            pass
+    return Profile(
+        id=pid, provider=provider, tier=d.get("tier", ""),
+        exe=os.path.expandvars(os.path.expanduser(d.get("exe", "llama-server"))),
+        model=os.path.expandvars(os.path.expanduser(d.get("model", "") or "")) if provider == "llama-server" else d.get("model_id", ""),
+        draft_model=d.get("draft_model"), mmproj=d.get("mmproj"),
+        port=port, ctx=d.get("ctx"), base_url=base_url,
+        flags=flags, raw_args=raw, description=d.get("description", ""),
+        weight_gb=d.get("weight_gb"), removed=bool(d.get("removed")),
+    )
+
+
+def _default_profiles_path() -> Path | None:
+    cfg = config_mod.get_config()
+    if cfg.profiles_file:
+        p = Path(cfg.profiles_file)
+        return p if p.is_file() else None
+    p = Path.home() / ".llama-mm" / "profiles.json"
+    return p if p.is_file() else None
+
+
+class ProfileError(RuntimeError):
+    pass
+
+
+def load_profiles() -> tuple[list[Profile], list[dict]]:
+    """Return (profiles, issues). JSON file is primary; env-amd adapter appends
+    when config.env_amd_file is set and no JSON profile shares the id."""
+    profiles: list[Profile] = []
+    issues: list[dict] = []
+    path = _default_profiles_path()
+    if path:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as e:
+            raise ProfileError(f"profiles 文件解析失败 {path}: {e}") from e
+        for pid, d in (data.get("profiles") or {}).items():
+            try:
+                profiles.append(_from_json(pid, d or {}))
+            except Exception as e:  # noqa: BLE001 - report, don't drop the rest
+                issues.append({"kind": "bad_profile", "detail": f"{pid}: {e}"})
+    cfg = config_mod.get_config()
+    if cfg.env_amd_file:
+        from . import env_amd_adapter as adapter
+        res = adapter.parse_env_amd(cfg.env_amd_file, aliases=cfg.env_amd_aliases)
+        known = {p.id for p in profiles}
+        for p in res.profiles:
+            if p.id not in known:
+                profiles.append(p)
+        issues += [{"kind": i.kind, "line": i.line, "detail": i.detail} for i in res.issues]
+    return profiles, issues
+
+
+def find_profile(profile_id: str) -> Profile:
+    profiles, _ = load_profiles()
+    for p in profiles:
+        if p.id == profile_id:
+            return p
+    ids = ", ".join(p.id for p in profiles) or "(无 — 先创建 ~/.llama-mm/profiles.json，参考 profiles.example.json)"
+    raise ProfileError(f"找不到 profile '{profile_id}'。可用: {ids}")

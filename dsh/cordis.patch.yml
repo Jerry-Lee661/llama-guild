@@ -1,0 +1,17 @@
+# Cordis patch overlay: registers llama-multimodel-mcp as an MCP server inside
+# DSH (deepseek-harness). Requires the MCP server to be installed (pip install
+# -e mcp-server) and profiles configured (~/.llama-mm/profiles.json).
+#
+# Usage:
+#   dsh web --patch /path/to/llama-multimodel-workflow/dsh/cordis.patch.yml
+# or install permanently: see dsh/README.md.
+#
+# NOTE: verified against @deepseek-ai/dsh-mcp-client's stdio transport; if your
+# DSH version expects different config keys, check `packages/mcp/mcp-client`.
+- id: llama-mm-mcp
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: llama-mm
+    transport: stdio
+    command: llama-multimodel-mcp
+    args: []
