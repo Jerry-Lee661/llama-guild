@@ -1,8 +1,8 @@
 ---
 name: setup-workflow
-description: 引导式问答部署指南：把 llama-multimodel-workflow 安装并配置进用户的 agent 工具。自动检测硬件/后端/已装组件，问答确认后端与模型档位（按显存推荐模型，参考 canirun.ai 数据），生成 ~/.llama-mm 配置、注册 MCP、安装 skills 并冒烟验证。
+description: 引导式问答部署指南：把 llama-guild（模型行会）安装并配置进用户的 agent 工具。自动检测硬件/后端/已装组件，问答确认后端与模型档位（按显存推荐模型，参考 canirun.ai 数据），生成 ~/.llama-mm 配置、注册 MCP、安装 skills 并冒烟验证。
 when_to_use: >-
-  当用户要求"安装这个仓库 / 部署 llama-multimodel-workflow / 帮我配置本地模型工作流 /
+  当用户要求"安装这个仓库 / 部署 llama-guild / 帮我安装模型行会 / 帮我配置本地模型工作流 /
   初始设置 / 接入本地模型"时使用。也适用于"我该用什么模型/多大量化"这类选型咨询。
 ---
 

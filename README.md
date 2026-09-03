@@ -1,8 +1,19 @@
-# llama-multimodel-workflow
+# llama-guild · 模型行会
 
 **Contract-driven coding workflow that makes your local LLM the executor — the strong model plans, the local model implements, tools accept.**
 
 **契约驱动的多模型编码工作流：强模型出契约，本地模型做落实，工具做验收。**
+
+> **为什么叫行会（Guild）？** 中世纪的行会靠三样东西运转：章程（契约）、师傅带学徒（模型分工）、出师考核（验收阶梯）。本项目一模一样——
+> A medieval guild ran on three things: a charter (contract), masters training apprentices (model tiers), and journeyman review (acceptance gates). So does this project.
+>
+> | 行会 | 本项目 |
+> |---|---|
+> | 行会章程 | `task-contract.md`（9 维度契约） |
+> | 老师傅 | 云端强模型（规划/接线/验收） |
+> | 学徒工（quality/bulk 两档） | 本地模型（按契约落实，一次一文件） |
+> | 出师考核 | L0-L4 工具验收阶梯 |
+> | 会首（主持行会，不动手刻字） | `hybrid-orchestrate` 编排 skill |
 
 [中文说明](#中文) · [English](#english) · [Methodology 方法论](docs/WORKFLOW.zh.md) · [Install 安装](docs/INSTALL.md)
 
@@ -58,8 +69,8 @@ actually use a local model as its implementation workforce:
 ### Quick start
 
 ```bash
-git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
-cd llama-multimodel-workflow
+git clone https://github.com/Jerry-Lee661/llama-guild.git
+cd llama-guild
 pip install -e mcp-server
 mkdir -p ~/.llama-mm
 cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # default = LM Studio :1234
@@ -137,8 +148,8 @@ Codex / VS Code / DSH）真正把本地模型当作落实生产力：
 工作原理见上方架构图。快速开始：
 
 ```bash
-git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
-cd llama-multimodel-workflow
+git clone https://github.com/Jerry-Lee661/llama-guild.git
+cd llama-guild
 pip install -e mcp-server
 mkdir -p ~/.llama-mm
 cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # 默认 default=LM Studio :1234

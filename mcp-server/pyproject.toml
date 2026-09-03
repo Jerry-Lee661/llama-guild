@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Jerry-Lee661/llama-multimodel-workflow"
+Homepage = "https://github.com/Jerry-Lee661/llama-guild"
 
 [project.scripts]
 llama-multimodel-mcp = "llama_multimodel_mcp.server:main"

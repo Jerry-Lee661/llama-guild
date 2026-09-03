@@ -23,7 +23,7 @@ This directory wires the contract-driven multi-model workflow into DSH.
    ```
 2. Try it as a patch overlay:
    ```bash
-   dsh web --patch /path/to/llama-multimodel-workflow/dsh/cordis.patch.yml
+   dsh web --patch /path/to/llama-guild/dsh/cordis.patch.yml
    ```
 3. For a permanent install, point a profile's `cordis.patch.yml` at these rows,
    or package them as an npm bundle (`"dsh": {"bundle": {"patch": "./cordis.patch.yml"}}`)

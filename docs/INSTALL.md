@@ -12,8 +12,8 @@ powershell -File install\get-llama.ps1          # 或: bash install/get-llama.sh
 #    装到 ~/.llama-mm/bin/current/，之后 config.json 的 server_exe 指向它
 
 # 1. 安装 MCP server（任选一个 python ≥3.10）
-git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
-cd llama-multimodel-workflow
+git clone https://github.com/Jerry-Lee661/llama-guild.git
+cd llama-guild
 pip install -e mcp-server
 
 # 2. 配置
