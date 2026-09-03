@@ -3,7 +3,7 @@
 # prints per-tool MCP registration snippets. Idempotent: re-running overwrites.
 
 $ErrorActionPreference = "Stop"
-$repo = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repo = Split-Path -Parent $PSScriptRoot   # script lives in <repo>\install
 $home_ = $env:USERPROFILE
 
 Write-Host "== llama-multimodel-workflow install ==" -ForegroundColor Cyan
