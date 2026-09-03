@@ -8,7 +8,7 @@
 
 ```bash
 # 1. 安装 MCP server（任选一个 python ≥3.10）
-git clone https://github.com/<you>/llama-multimodel-workflow.git
+git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
 cd llama-multimodel-workflow
 pip install -e mcp-server
 

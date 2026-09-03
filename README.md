@@ -58,7 +58,7 @@ actually use a local model as its implementation workforce:
 ### Quick start
 
 ```bash
-git clone https://github.com/<you>/llama-multimodel-workflow.git
+git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
 cd llama-multimodel-workflow
 pip install -e mcp-server
 cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # edit paths/ports
@@ -120,7 +120,7 @@ Codex / VS Code / DSH）真正把本地模型当作落实生产力：
 工作原理见上方架构图。快速开始：
 
 ```bash
-git clone https://github.com/<you>/llama-multimodel-workflow.git
+git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
 cd llama-multimodel-workflow
 pip install -e mcp-server
 cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # 改成你的路径/端口

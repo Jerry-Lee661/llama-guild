@@ -6,7 +6,7 @@
     "en": "Local marketplace: llama-router (local-model routing subagent; contract implementation is forced through the local model)."
   },
   "owner": {
-    "name": "llama-multimodel-workflow"
+    "name": "Jerry-Lee661"
   },
   "plugins": [
     {
@@ -15,7 +15,7 @@
       "description": "本地模型路由：local-executor 子智能体强制契约落实工作由本地模型生成代码（经 llama-multimodel-mcp 调度），云端主模型只做规划与验收。",
       "version": "0.1.0",
       "author": {
-        "name": "llama-multimodel-workflow"
+        "name": "Jerry-Lee661"
       }
     }
   ]
