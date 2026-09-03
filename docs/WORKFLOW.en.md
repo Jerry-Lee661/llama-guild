@@ -94,6 +94,17 @@ big context window; aim to never fill the one you have.
 5. **Tight exceptions**: takeover by the session model only after 3 consecutive
    `LOCAL_MODEL_FAILED`, or an explicit user request — and report first.
 
+> **Community evidence (2026-09, an LCZ forum thread on "one agent, two LLMs"):**
+> multiple practitioners independently report that skills / agent.md constraints
+> get obeyed "the first few times, then bypassed" — trimming tools is not enough
+> either. What works are **mechanical gates**: mandatory, machine-checkable
+> conditions that physically block progress (e.g. "security review must attach
+> frontier-model evidence or the commit is refused"). This repo's list-based
+> dispatch, provider feature gating and VRAM guard implement that principle. The
+> same thread names "information shuttling" as the biggest pain of multi-model
+> collaboration — contract task packages (minimal context + structured returns)
+> are the engineered answer.
+
 ## 6. Relation to existing projects
 
 - [github/spec-kit](https://github.com/github/spec-kit): spec-driven process.
