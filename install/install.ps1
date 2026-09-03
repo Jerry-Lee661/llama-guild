@@ -24,11 +24,9 @@ foreach ($t in $targets) {
 }
 
 # 2. Agents
-if (Test-Path "$home_\.claude\agents" -or $true) {
-  New-Item -ItemType Directory -Force -Path "$home_\.claude\agents" | Out-Null
-  Copy-Item "$repo\agents\claude\local-executor.md" "$home_\.claude\agents\" -Force
-  Write-Host "[agents] -> Claude Code: ~\.claude\agents\local-executor.md"
-}
+New-Item -ItemType Directory -Force -Path "$home_\.claude\agents" | Out-Null
+Copy-Item "$repo\agents\claude\local-executor.md" "$home_\.claude\agents\" -Force
+Write-Host "[agents] -> Claude Code: ~\.claude\agents\local-executor.md"
 
 # 3. MCP server install check
 $py = (Get-Command python -ErrorAction SilentlyContinue).Source
