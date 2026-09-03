@@ -29,6 +29,7 @@ Write-Host "[get-llama] 查询 $repo 最新带 $Backend 二进制的 release ...
 # vX.Y.Z stable releases carry no binaries; b[NUM] nightlies do — scan the list.
 $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases?per_page=20" -Headers @{ 'User-Agent' = 'llama-mm-getllama' }
 $release = $releases | Where-Object {
+    ($Version -eq '' -or $_.tag_name -eq $Version) -and
     $_.tag_name -match '^b\d+$' -and ($_.assets | Where-Object { $_.name -match $assetRe })
 } | Select-Object -First 1
 if (-not $release) {
@@ -50,6 +51,13 @@ if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
 }
 if (-not (Test-Path $zip) -or (Get-Item $zip).Length -eq 0) {
     Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -UseBasicParsing
+}
+if ($ExpectedSha256) {
+    $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+    if ($sha -ne $ExpectedSha256.ToLower()) {
+        Write-Host "[get-llama] SHA256 mismatch: $sha"; exit 1
+    }
+    Write-Host "[get-llama] SHA256 verified"
 }
 
 $verDir = Join-Path $InstallDir "b$ver"

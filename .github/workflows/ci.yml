@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install package
+        run: pip install -e mcp-server
+      - name: Offline tests (parser, profiles, provider gating, path safety)
+        run: python mcp-server/tests/test_offline.py
+      - name: JSON examples parse
+        run: python -c "import json; [json.load(open(p, encoding='utf-8-sig')) for p in ['mcp-server/config.example.json','mcp-server/profiles.example.json','vscode/mcp.json.example','agents/marketplace.json']]; print('json ok')"
+      - name: stdio smoke (18 tools listed)
+        run: python -c "from llama_multimodel_mcp.server import mcp; import asyncio; tools = asyncio.run(mcp.list_tools()); assert len(tools) == 18, len(tools); print('tools:', len(tools))"

@@ -431,6 +431,11 @@ def validate_profiles() -> dict:
 
 
 def main() -> None:
+    cfg = get_config()
+    if cfg.host not in ("127.0.0.1", "localhost", "::1"):
+        print(f"[llama-mm] WARNING: host={cfg.host} 不是回环地址。本 server 无鉴权且具备"
+              "进程控制等高权限能力，仅供受信任的本机客户端使用，不要暴露到网络。",
+              file=sys.stderr)
     mcp.run()
 
 

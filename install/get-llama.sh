@@ -8,9 +8,14 @@
 #   bash get-llama.sh ubuntu-x64 ~/bin/llama
 set -euo pipefail
 
+# SECURITY: downloads and runs prebuilt binaries from the official ggml-org/
+# llama.cpp releases. Pin VERSION= and pass EXPECTED_SHA256 for a verifiable
+# install; otherwise you trust the latest upstream release as-is.
 REPO="ggml-org/llama.cpp"
 TARGET="${1:-}"
 INSTALL_DIR="${2:-$HOME/.llama-mm/bin}"
+VERSION="${3:-}"
+EXPECTED_SHA256="${4:-}"
 
 case "$TARGET" in
   macos-arm64) ASSET_RE='bin-macos-arm64\.zip$' ;;
@@ -35,6 +40,8 @@ import json, sys, re
 for rel in json.load(sys.stdin):
     if not re.match(r'^b\d+$', rel['tag_name']):
         continue
+    if VERSION and rel['tag_name'] != VERSION:
+        continue
     for a in rel.get('assets', []):
         if re.search(r'$ASSET_RE', a['name']):
             print(rel['tag_name'] + ' ' + a['browser_download_url'])
@@ -56,6 +63,13 @@ fi
 TMP=$(mktemp -d)
 echo "[get-llama] 下载 $URL ..."
 curl -L -sS -o "$TMP/llama.zip" "$URL"
+if [ -n "$EXPECTED_SHA256" ]; then
+  SHA=$(sha256sum "$TMP/llama.zip" | cut -d' ' -f1)
+  if [ "$SHA" != "$(echo "$EXPECTED_SHA256" | tr 'A-Z' 'a-z')" ]; then
+    echo "[get-llama] SHA256 mismatch: $SHA"; exit 1
+  fi
+  echo "[get-llama] SHA256 verified"
+fi
 mkdir -p "$INSTALL_DIR/b$VER"
 unzip -oq "$TMP/llama.zip" -d "$INSTALL_DIR/b$VER"
 rm -rf "$TMP"

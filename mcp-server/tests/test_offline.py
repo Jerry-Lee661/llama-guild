@@ -77,6 +77,20 @@ def test_provider_gating():
         assert "llama-server" in str(e)
 
 
+def test_log_path_traversal_rejected():
+    from llama_multimodel_mcp import process_mgr
+    for evil in (r"..\..\evil", "../../etc/passwd", "/abs/path", "a/b", "..", "a..b"):
+        try:
+            process_mgr.log_path_for(evil)
+            raise AssertionError(f"should have rejected {evil!r}")
+        except ValueError:
+            pass
+    ok = process_mgr.log_path_for("qwen3.8-27b-uncensored")
+    assert ok.endswith("qwen3.8-27b-uncensored.log")
+    router = process_mgr.log_path_for("router-8081")
+    assert router.endswith("router-8081.log")
+
+
 def test_default_profile(tmp_path=None):
     import tempfile
     from llama_multimodel_mcp.profiles import read_default_id, _from_json

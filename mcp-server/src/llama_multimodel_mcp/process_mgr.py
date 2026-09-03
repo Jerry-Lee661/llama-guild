@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import time
 
@@ -13,6 +14,16 @@ from .config import get_config
 
 # Processes this MCP server spawned in-process (profile_id -> psutil.Process).
 _started: dict[str, psutil.Process] = {}
+
+# profile ids end up in filesystem paths (log files); keep them strictly safe.
+_SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
+
+
+def safe_profile_id(profile_id: str) -> str:
+    """Reject path separators / traversal before an id touches the filesystem."""
+    if not _SAFE_ID.fullmatch(profile_id) or ".." in profile_id:
+        raise ValueError(f"非法 profile_id（仅允许字母数字与 . _ -）: {profile_id!r}")
+    return profile_id
 
 
 def find_servers() -> list[dict]:
@@ -114,6 +125,7 @@ def vram_conflicts(new_weight_gb: float | None) -> list[str]:
 
 def start_profile(exe: str, args: list[str], profile_id: str,
                   extra_path: str | None = None) -> psutil.Process:
+    profile_id = safe_profile_id(profile_id)
     cfg = get_config()
     log_dir = cfg.log_dir or os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
     os.makedirs(log_dir, exist_ok=True)
@@ -173,6 +185,11 @@ def wait_health(port: int, timeout_s: float = 300.0) -> dict:
 
 
 def log_path_for(profile_id: str) -> str:
+    safe = safe_profile_id(profile_id)
     cfg = get_config()
-    log_dir = cfg.log_dir or os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
-    return os.path.join(log_dir, f"{profile_id}.log")
+    log_dir = os.path.abspath(cfg.log_dir or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "logs"))
+    path = os.path.abspath(os.path.join(log_dir, safe + ".log"))
+    if os.path.commonpath([path, log_dir]) != log_dir:   # containment belt-and-braces
+        raise ValueError(f"日志路径越界: {profile_id!r}")
+    return path

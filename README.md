@@ -61,6 +61,7 @@ actually use a local model as its implementation workforce:
 git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
 cd llama-multimodel-workflow
 pip install -e mcp-server
+mkdir -p ~/.llama-mm
 cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # default = LM Studio :1234
 bash install/install.sh        # or: powershell -File install\install.ps1
 # no llama.cpp yet?  bash install/get-llama.sh   (Windows: install\get-llama.ps1)
@@ -93,11 +94,20 @@ contract → `hybrid-orchestrate`. Full guide: [docs/INSTALL.md](docs/INSTALL.md
 - macOS/Linux: experimental (process management is cross-platform psutil, but
   only Windows is battle-tested).
 
-### Privacy
+### Privacy & security
 
-No telemetry. Token stats are written to a local file only. The repository
-contains no machine-specific paths, ports, or hardware identifiers — the
-examples are placeholders.
+No telemetry. Token stats are written to a local file only. Example configs use
+placeholders — no developer machine paths or credentials are included.
+
+**Trust model (read before exposing this to anything untrusted):** the MCP
+server is a *local, high-privilege debugging tool*. It can start/stop
+llama-server processes, launch arbitrary configured binaries with
+`extra_args`, and issue arbitrary HTTP requests to the configured endpoint
+(`raw_request`). There is **no authentication** — bind it to localhost, use it
+only with trusted local clients, and never expose it to a network. The
+`get-llama` downloaders fetch and run prebuilt binaries from the official
+llama.cpp GitHub releases; pin a version and pass an expected SHA-256 for a
+verifiable install.
 
 ### Docs
 
@@ -130,6 +140,7 @@ Codex / VS Code / DSH）真正把本地模型当作落实生产力：
 git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
 cd llama-multimodel-workflow
 pip install -e mcp-server
+mkdir -p ~/.llama-mm
 cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # 默认 default=LM Studio :1234
 powershell -File install\install.ps1     # 或 bash install/install.sh
 # 还没有 llama.cpp？  powershell -File install\get-llama.ps1   （或 install/get-llama.sh）
@@ -157,9 +168,15 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
   原生生命周期适配器计划 v0.2
 - macOS/Linux 标注 experimental（进程管理用 psutil 跨平台，但仅 Windows 实测）
 
-### 隐私
+### 隐私与安全
 
-无任何遥测；token 统计只写本地文件；仓库不含任何机器特定路径、端口、硬件信息，示例全部占位符。
+无任何遥测；token 统计只写本地文件；示例配置全部占位符，不含开发者机器路径或凭据。
+
+**信任模型（暴露给不可信环境前必读）**：本 MCP server 是**本地高权限调试工具**——
+可以启停 llama-server 进程、以 `extra_args` 启动配置中的任意二进制、向配置端点
+直发任意 HTTP 请求（`raw_request`），且**没有任何鉴权**。只绑定 localhost、只给
+受信任的本地客户端使用，切勿暴露到网络。`get-llama` 会下载并运行 llama.cpp
+官方 release 的预编译二进制；固定版本并传入期望 SHA-256 可获得可验证安装。
 
 ### 文档
 
