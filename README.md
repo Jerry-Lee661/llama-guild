@@ -68,6 +68,10 @@ bash install/install.sh        # or: powershell -File install\install.ps1
 
 The example `default` profile points at LM Studio's standard port 1234 — with
 LM Studio running and a model loaded, `chat` works with zero further config.
+Or skip this and let the agent install it for you: invoke the `setup-workflow`
+skill (guided Q&A — backend, model recommendation by VRAM with canirun.ai-style
+reference data, config generation, MCP registration, smoke test).
+
 Then, in a new session of your agent tool: `plan-contract` → confirm the
 contract → `hybrid-orchestrate`. Full guide: [docs/INSTALL.md](docs/INSTALL.md).
 
@@ -132,7 +136,8 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
 ```
 
 示例 `default` 档位指向 LM Studio 默认端口 1234——LM Studio 加载模型后无需任何
-编辑即可 `chat`。
+编辑即可 `chat`。也可以什么都不改，直接让 agent 跑 `setup-workflow` skill：
+问答式选后端、按显存推荐模型（参考 canirun.ai 数据）、生成配置并注册 MCP。
 
 新开会话后：`plan-contract` 出契约 → 确认 → `hybrid-orchestrate` 统筹落实。
 完整指南见 [docs/INSTALL.md](docs/INSTALL.md)。

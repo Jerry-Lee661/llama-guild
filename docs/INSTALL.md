@@ -57,6 +57,12 @@ python mcp-server/tests/test_offline.py
 | VS Code | 三个 `.agent.md` chat-mode（复制进目标仓库） | chat-mode 即角色 | `<repo>/.vscode/mcp.json` | chat-mode 手动/子agent |
 | DSH | agent-presets（planner/executor persona） | preset 即角色 | cordis.patch.yml | preset + subagent |
 
+## 引导式部署 / Guided setup
+
+以上 0-2 步可以交给 agent 代办：在 agent 会话里说 **"用 setup-workflow 帮我部署"**，
+它会检测硬件与后端、按显存推荐模型（参考 canirun.ai 数据）、生成 `~/.llama-mm` 配置、
+注册 MCP 并冒烟验证。
+
 ## 一键安装 / One-shot install
 
 - Windows: `powershell -ExecutionPolicy Bypass -File install\install.ps1`
