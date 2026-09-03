@@ -17,7 +17,7 @@ from mcp.server.fastmcp import FastMCP
 from . import bench as bench_mod
 from . import env_amd_adapter, llama_client, process_mgr, profiles as profiles_mod, stats
 from .config import get_config
-from .profiles import Profile, ProfileError, find_profile, load_profiles
+from .profiles import Profile, ProfileError, find_profile, load_profiles, read_default_id
 from .providers import UnsupportedFeature, require
 
 mcp = FastMCP(
@@ -27,6 +27,7 @@ mcp = FastMCP(
         "典型流程：list_profiles 看档位 → start_profile/switch_profile 启动 → "
         "chat/complete 调试推理 → bench 测速 → server_status 看 VRAM → usage_stats 看统计。"
         "tier 字段驱动工作流路由：quality=高质量执行档，bulk=高速批量档。"
+        "未指定 profile_id 时回退到 profiles.json 的 default 档位（未设置则要求用户指定）。"
         "provider=openai-compatible（LM Studio/Ollama/vLLM）仅支持推理与统计。"
     ),
 )
@@ -35,7 +36,8 @@ mcp = FastMCP(
 # ---------- targeting helpers ----------
 
 def _target(profile_id: str | None, port: int | None) -> tuple[int | str, Profile | None]:
-    """Resolve a tool target to (base, profile). base = int port or full URL."""
+    """Resolve a tool target to (base, profile). base = int port or full URL.
+    Falls back to the profiles.json "default" profile when both are omitted."""
     if profile_id:
         p = find_profile(profile_id)
         base = p.base_url or (p.port if p.port is not None else None)
@@ -44,7 +46,15 @@ def _target(profile_id: str | None, port: int | None) -> tuple[int | str, Profil
         return base, p
     if port is not None:
         return port, None
-    raise ValueError("需要 profile_id 或 port 之一")
+    d = read_default_id()
+    if d:
+        p = find_profile(d)
+        base = p.base_url or p.port
+        if base is not None:
+            return base, p
+    raise ValueError(
+        '需要 profile_id 或 port 之一；也可在 profiles.json 顶层设置 "default": "<档位id>" '
+        '作为未指定时的回退')
 
 
 def _need(profile: Profile | None, feature: str, port: int | None) -> None:
@@ -89,12 +99,14 @@ def _psutil_name(pid: int) -> str | None:
 def list_profiles(include_removed: bool = False) -> dict:
     """列出全部模型档位（provider、tier、端口、ctx、关键参数、权重）。tier: quality=高质量执行档, bulk=高速批量档。"""
     profs, issues = load_profiles()
+    default = read_default_id()
     out = []
     for p in profs:
         if p.removed and not include_removed:
             continue
         out.append({
             "id": p.id, "provider": p.provider, "tier": p.tier or None,
+            "default": p.id == default,
             "port": p.port, "ctx": p.ctx,
             "model": os.path.basename(p.model) if p.model else None,
             "draft_model": os.path.basename(p.draft_model) if p.draft_model else None,
@@ -105,7 +117,7 @@ def list_profiles(include_removed: bool = False) -> dict:
                                    "--temp", "--top-p", "--top-k", "--n-predict")},
             "note": p.description[:200],
         })
-    return {"count": len(out), "profiles": out, "issues": issues or None}
+    return {"count": len(out), "default": default, "profiles": out, "issues": issues or None}
 
 
 # ---------- 2. status ----------
@@ -141,12 +153,22 @@ def server_status() -> dict:
 
 # ---------- 3-6. lifecycle (llama-server only) ----------
 
+def _profile_or_default(profile_id: str | None) -> Profile:
+    if profile_id:
+        return find_profile(profile_id)
+    d = read_default_id()
+    if d:
+        return find_profile(d)
+    raise ValueError(
+        '需要 profile_id；也可在 profiles.json 顶层设置 "default": "<档位id>" 作为缺省')
+
+
 @mcp.tool()
-def start_profile(profile_id: str, ctx: int | None = None,
+def start_profile(profile_id: str | None = None, ctx: int | None = None,
                   extra_args: list[str] | None = None, force: bool = False,
                   wait_seconds: float = 300.0) -> dict:
-    """按档位启动 llama-server（ctx 可覆盖）。端口被占或 VRAM 超预算时拒绝（force=true 越过 VRAM 限制）。"""
-    p = find_profile(profile_id)
+    """按档位启动 llama-server（ctx 可覆盖；profile_id 省略时用 profiles 的 default 档）。端口被占或 VRAM 超预算时拒绝（force=true 越过 VRAM 限制）。"""
+    p = _profile_or_default(profile_id)
     require(p.provider, "start")
     if p.removed and not force:
         raise ValueError(f"profile {p.id} 标记为已移除（模型文件可能已删），确认请传 force=true")
@@ -175,9 +197,9 @@ def start_profile(profile_id: str, ctx: int | None = None,
 
 
 @mcp.tool()
-def stop_profile(profile_id: str) -> dict:
-    """停止某档位对应的 llama-server 实例（按监听端口定位，树杀）。"""
-    p = find_profile(profile_id)
+def stop_profile(profile_id: str | None = None) -> dict:
+    """停止某档位对应的 llama-server 实例（按监听端口定位，树杀；省略时用 default 档）。"""
+    p = _profile_or_default(profile_id)
     require(p.provider, "stop")
     if p.port is None:
         raise ValueError(f"profile {p.id} 缺少 port")
@@ -197,10 +219,10 @@ def stop_all() -> dict:
 
 
 @mcp.tool()
-def switch_profile(profile_id: str, ctx: int | None = None, force: bool = False,
+def switch_profile(profile_id: str | None = None, ctx: int | None = None, force: bool = False,
                    wait_seconds: float = 300.0) -> dict:
-    """切换档位：先停掉全部 llama-server（显存同一时刻只容一个大盘），再启动目标档。"""
-    p = find_profile(profile_id)
+    """切换档位：先停掉全部 llama-server（显存同一时刻只容一个大盘），再启动目标档（省略时用 default 档）。"""
+    p = _profile_or_default(profile_id)
     require(p.provider, "switch")
     stopped = [i["pid"] for i in process_mgr.find_servers()]
     process_mgr.stop_all()
@@ -399,6 +421,10 @@ def validate_profiles() -> dict:
         if p.port is not None and p.provider == "llama-server":
             by_port.setdefault(p.port, []).append(p.id)
     tiers = {p.id: p.tier or None for p in profs if p.tier}
+    if not read_default_id() and profs:
+        issues.append({"kind": "no_default",
+                       "detail": '未设置 "default" 档位——未指定 profile_id 的调用将要求用户选择。'
+                                 '建议在 profiles.json 顶层加 "default": "<档位id>"'})
     return {"profiles": len(profs), "tiers": tiers, "issues": issues,
             "missing_files": missing,
             "port_reuse": {str(k): v for k, v in by_port.items() if len(v) > 1}}

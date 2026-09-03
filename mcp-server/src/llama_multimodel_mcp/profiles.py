@@ -63,7 +63,7 @@ def _from_json(pid: str, d: dict) -> Profile:
     return Profile(
         id=pid, provider=provider, tier=d.get("tier", ""),
         exe=os.path.expandvars(os.path.expanduser(d.get("exe", "llama-server"))),
-        model=os.path.expandvars(os.path.expanduser(d.get("model", "") or "")) if provider == "llama-server" else d.get("model_id", ""),
+        model=os.path.expandvars(os.path.expanduser(d.get("model") or "")) if provider == "llama-server" else (d.get("model_id") or ""),
         draft_model=d.get("draft_model"), mmproj=d.get("mmproj"),
         port=port, ctx=d.get("ctx"), base_url=base_url,
         flags=flags, raw_args=raw, description=d.get("description", ""),
@@ -110,6 +110,19 @@ def load_profiles() -> tuple[list[Profile], list[dict]]:
                 profiles.append(p)
         issues += [{"kind": i.kind, "line": i.line, "detail": i.detail} for i in res.issues]
     return profiles, issues
+
+
+def read_default_id(path: str | None = None) -> str | None:
+    """Return the profiles.json "default" profile id, if set."""
+    p = Path(path) if path else _default_profiles_path()
+    if not p or not p.is_file():
+        return None
+    try:
+        d = json.loads(p.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    v = d.get("default")
+    return v if isinstance(v, str) else None
 
 
 def find_profile(profile_id: str) -> Profile:

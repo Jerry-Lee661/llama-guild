@@ -77,6 +77,24 @@ def test_provider_gating():
         assert "llama-server" in str(e)
 
 
+def test_default_profile(tmp_path=None):
+    import tempfile
+    from llama_multimodel_mcp.profiles import read_default_id, _from_json
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+        json.dump({"default": "lmstudio",
+                   "profiles": {"lmstudio": {"provider": "openai-compatible",
+                                             "base_url": "http://127.0.0.1:1234"}}}, f)
+        tmp = f.name
+    try:
+        assert read_default_id(tmp) == "lmstudio"
+        assert read_default_id(str(tmp_path or "Z:/definitely/missing.json")) is None
+        p = _from_json("lmstudio", {"provider": "openai-compatible",
+                                    "base_url": "http://127.0.0.1:1234", "model_id": None})
+        assert p.model == "" and p.base_url.endswith(":1234")
+    finally:
+        os.unlink(tmp)
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

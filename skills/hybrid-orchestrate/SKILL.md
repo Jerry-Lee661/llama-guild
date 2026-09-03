@@ -43,7 +43,7 @@ when_to_use: >-
 | VS Code | `.github/agents/` 的 local-executor chat-mode（用户逐个调用），或按其子agent机制派发 |
 | DSH | executor preset（persona + 工具过滤），经 subagent 机制派发 |
 
-无论哪种形态，委派消息必须包含：`profile_id`、最小任务包（唯一目标文件、接口契约、≤5 参考片段、禁读清单、最窄验证命令）。
+无论哪种形态，委派消息必须包含：`profile_id`、最小任务包（唯一目标文件、接口契约、≤5 参考片段、禁读清单、最窄验证命令）。profile_id 缺失时：profiles.json 设有 `default` 档位则用它；都没有则询问用户，并把用户的选择写为 `default`。
 
 ## 调度前检查
 

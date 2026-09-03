@@ -61,10 +61,13 @@ actually use a local model as its implementation workforce:
 git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
 cd llama-multimodel-workflow
 pip install -e mcp-server
-cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # edit paths/ports
+cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # default = LM Studio :1234
 bash install/install.sh        # or: powershell -File install\install.ps1
+# no llama.cpp yet?  bash install/get-llama.sh   (Windows: install\get-llama.ps1)
 ```
 
+The example `default` profile points at LM Studio's standard port 1234 — with
+LM Studio running and a model loaded, `chat` works with zero further config.
 Then, in a new session of your agent tool: `plan-contract` → confirm the
 contract → `hybrid-orchestrate`. Full guide: [docs/INSTALL.md](docs/INSTALL.md).
 
@@ -123,9 +126,13 @@ Codex / VS Code / DSH）真正把本地模型当作落实生产力：
 git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
 cd llama-multimodel-workflow
 pip install -e mcp-server
-cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # 改成你的路径/端口
+cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json   # 默认 default=LM Studio :1234
 powershell -File install\install.ps1     # 或 bash install/install.sh
+# 还没有 llama.cpp？  powershell -File install\get-llama.ps1   （或 install/get-llama.sh）
 ```
+
+示例 `default` 档位指向 LM Studio 默认端口 1234——LM Studio 加载模型后无需任何
+编辑即可 `chat`。
 
 新开会话后：`plan-contract` 出契约 → 确认 → `hybrid-orchestrate` 统筹落实。
 完整指南见 [docs/INSTALL.md](docs/INSTALL.md)。

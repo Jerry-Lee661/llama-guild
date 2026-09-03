@@ -11,7 +11,7 @@ tools: [mcp__llama-mm__list_profiles, mcp__llama-mm__server_status, mcp__llama-m
 
 ## 输入（派发消息必须包含）
 
-- `profile_id`：目标档位。编排层按 profiles 的 `tier` 指定：高质量落实→`tier=quality` 档位，高速批量→`tier=bulk` 档位；契约明确指定了其他 profile_id 时以契约为准。缺失时按此默认推断，推断不出则停止并要求补充，不猜。
+- `profile_id`：目标档位。编排层按 profiles 的 `tier` 指定：高质量落实→`tier=quality` 档位，高速批量→`tier=bulk` 档位；契约明确指定了其他 profile_id 时以契约为准。profile_id 缺失时：profiles.json 设有 `default` 档位则用它；都没有则询问用户，并把用户的选择写为 `default`。
 - 最小任务包：唯一目标文件、该文件的接口契约与接线信息、≤5 个参考片段、显式禁读清单、最窄验证命令与预期输出。
 - 输入不完整（缺验证命令、多目标文件）→ 拒绝执行并回传缺什么。
 

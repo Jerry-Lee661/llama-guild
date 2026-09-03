@@ -7,6 +7,10 @@
 ## 通用前置 / Prerequisites
 
 ```bash
+# 0. 没有 llama.cpp？一键下载官方预编译版（Windows vulkan / macOS arm64 / Ubuntu x64）
+powershell -File install\get-llama.ps1          # 或: bash install/get-llama.sh
+#    装到 ~/.llama-mm/bin/current/，之后 config.json 的 server_exe 指向它
+
 # 1. 安装 MCP server（任选一个 python ≥3.10）
 git clone https://github.com/Jerry-Lee661/llama-multimodel-workflow.git
 cd llama-multimodel-workflow
@@ -22,7 +26,12 @@ cp mcp-server/profiles.example.json ~/.llama-mm/profiles.json
 python mcp-server/tests/test_offline.py
 ```
 
-**profiles.json 两个关键字段**：
+**零配置路径（LM Studio 用户）**：`profiles.example.json` 的 `default` 就是
+`lmstudio`（`http://127.0.0.1:1234`）——装好 LM Studio 并加载模型后，不做任何
+编辑即可使用 `chat` / `usage_stats`；`server_status` 也能看到它。
+
+**profiles.json 三个关键字段**：
+- `default`（顶层）: 未指定 profile_id 时回退的档位——示例默认 `lmstudio`（:1234）
 - `provider`: `llama-server`（全功能：生命周期/原生补全/router/MTP 遥测）或
   `openai-compatible`（LM Studio :1234 / Ollama :11434/v1 / vLLM / llama-swap —— 推理 + 统计）
 - `tier`: `quality`（高质量执行档）或 `bulk`（高速批量档）——工作流路由依据
