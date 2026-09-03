@@ -23,7 +23,7 @@ when_to_use: >-
 | Ollama | 探测 `http://127.0.0.1:11434` | 通 → 后端候选 |
 | llama.cpp 二进制 | `~/.llama-mm/bin/current/` 是否存在 | 有 → 复用 |
 | 已有配置 | `~/.llama-mm/profiles.json` | 存在 → 询问"重配还是保留追加" |
-| 宿主工具 | `~/.zcode`、`~/.claude`、`~/.codex` 目录存在性 | 决定第 4 步注册哪些端 |
+| 宿主工具 | `~/.zcode`、`~/.claude`、`~/.codex`、`~/.pi`、`~/.omp` 目录存在性 | 决定第 4 步注册哪些端 |
 
 ## 第 1 步：问答回合——后端
 
@@ -66,6 +66,8 @@ when_to_use: >-
 | ZCode | 合并到 `~/.zcode/cli/config.json`：`{"mcp":{"servers":{"llama-mm":{"command":"<python>","args":["-m","llama_multimodel_mcp.server"]}}}}`；子agent 插件：设置→插件管理→发现→"+"→选本仓库 `agents/` 目录 | skills 复制到 `~/.zcode/skills` |
 | Claude Code | `claude mcp add llama-mm -- python -m llama_multimodel_mcp.server`；agent 复制到 `~/.claude/agents/` | skills 复制到 `~/.claude/skills` |
 | Codex | `~/.codex/config.toml` 加 `[mcp_servers.llama-mm]` | skills 复制到 `~/.agents/skills` |
+| pi | 写 `~/.agents/mcp.json`（llama-mm 条目）+ 引导 `pi install npm:pi-mcp-adapter` | skills 已在 `~/.agents/skills`，零复制 |
+| omp | 继承 `~/.claude` 与 `.vscode` 的 skills/MCP，零注册；可选写 `~/.omp/agent/models.yml` 直连本地档 | 继承制 |
 | VS Code | `vscode/mcp.json.example` → 目标仓库 `.vscode/mcp.json`；chat-mode 复制到 `.github/agents/` | 逐仓库生效 |
 
 一键脚本 `install/install.ps1`（或 `.sh`）等价于"复制 skills + 打印注册片段"，可直接代跑。

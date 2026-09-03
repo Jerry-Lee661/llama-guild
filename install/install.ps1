@@ -28,6 +28,26 @@ New-Item -ItemType Directory -Force -Path "$home_\.claude\agents" | Out-Null
 Copy-Item "$repo\agents\claude\local-executor.md" "$home_\.claude\agents\" -Force
 Write-Host "[agents] -> Claude Code: ~\.claude\agents\local-executor.md"
 
+# 2b. Tool-agnostic MCP config (~/.agents/mcp.json) — read by pi (pi-mcp-adapter)
+#     and other tools that follow the shared convention. Only written if absent.
+$agentsMcp = "$home_\.agents\mcp.json"
+if (Test-Path $agentsMcp) {
+  Write-Host "[mcp.json] $agentsMcp 已存在，请自行合并 llama-mm 条目"
+} else {
+  New-Item -ItemType Directory -Force -Path "$home_\.agents" | Out-Null
+  @'
+{
+  "mcpServers": {
+    "llama-mm": {
+      "command": "python",
+      "args": ["-m", "llama_multimodel_mcp.server"]
+    }
+  }
+}
+'@ | Set-Content -Path $agentsMcp -Encoding UTF8
+  Write-Host "[mcp.json] 已写入 $agentsMcp（pi-mcp-adapter 等工具自动识别）"
+}
+
 # 3. MCP server install check
 $py = (Get-Command python -ErrorAction SilentlyContinue).Source
 Write-Host ""

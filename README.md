@@ -25,8 +25,9 @@
 Local 27-35B models are competent *fill-in executors* but poor *self-driven
 engineers*: they follow contracts and reference snippets reliably, and fail
 when told to explore a repository freely. This project packages the missing
-pieces so a coding agent (ZCode / Claude Code / Codex / VS Code / DSH) can
-actually use a local model as its implementation workforce:
+pieces so a coding agent (ZCode / Claude Code / Codex / VS Code / DSH, plus pi and
+omp via shared conventions) can actually use a local model as its implementation
+workforce:
 
 - **3 workflow skills** — `plan-contract` (the strong model produces a 9-section
   `task-contract.md` instead of a vague plan), `contract-execute` (one file per
@@ -94,7 +95,7 @@ contract → `hybrid-orchestrate`. Full guide: [docs/INSTALL.md](docs/INSTALL.md
 | [spec-kit](https://github.com/github/spec-kit) | spec-driven process | local-model routing (their #1504/#1784 do it by hand) |
 | [llama-swap](https://github.com/mostlygeek/llama-swap) | model hot-swap proxy | no workflow layer (contracts/routing/acceptance) |
 | BYOK provider plugins | model access | no division of labor |
-| **this repo** | **contract task packages + forced local routing + context budgets + acceptance ladder + profiled lifecycle (tuned args / spec-decode telemetry / token stats), packaged for 5 agent tools** | single-model inference access is left to BYOK plugins (complementary) |
+| **this repo** | **contract task packages + forced local routing + context budgets + acceptance ladder + profiled lifecycle (tuned args / spec-decode telemetry / token stats), packaged for 7 agent tools** | single-model inference access is left to BYOK plugins (complementary) |
 
 ### Providers
 
@@ -123,7 +124,7 @@ verifiable install.
 ### Docs
 
 - [Methodology (EN core)](docs/WORKFLOW.en.md) / [方法论（中文完整版）](docs/WORKFLOW.zh.md)
-- [Install (5 targets)](docs/INSTALL.md) · [Reference baselines 基线](docs/BENCHMARKS.zh.md) · [DSH](dsh/README.md) · [MCP server](mcp-server/README.md)
+- [Install (7 targets)](docs/INSTALL.md) · [Reference baselines 基线](docs/BENCHMARKS.zh.md) · [DSH](dsh/README.md) · [MCP server](mcp-server/README.md)
 
 MIT licensed. Windows-tested on llama.cpp b11xx; issues and profile contributions welcome.
 
@@ -191,7 +192,7 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
 
 ### 文档
 
-[方法论（中文完整版）](docs/WORKFLOW.zh.md) · [安装（五端）](docs/INSTALL.md) ·
+[方法论（中文完整版）](docs/WORKFLOW.zh.md) · [安装（七端）](docs/INSTALL.md) ·
 [参考基线](docs/BENCHMARKS.zh.md) · [DSH 接入](dsh/README.md) · [MCP server](mcp-server/README.md)
 
 MIT 许可。Windows + llama.cpp b11xx 实测；欢迎 issue 与档位贡献。

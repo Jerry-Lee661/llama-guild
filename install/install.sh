@@ -24,6 +24,26 @@ mkdir -p "$HOME_DIR/.claude/agents"
 cp "$REPO/agents/claude/local-executor.md" "$HOME_DIR/.claude/agents/"
 echo "[agents] -> Claude Code: ~/.claude/agents/local-executor.md"
 
+# 2b. Tool-agnostic MCP config (~/.agents/mcp.json) — read by pi (pi-mcp-adapter)
+#     and other tools that follow the shared convention. Only written if absent.
+AGENTS_MCP="$HOME_DIR/.agents/mcp.json"
+if [ -f "$AGENTS_MCP" ]; then
+  echo "[mcp.json] $AGENTS_MCP 已存在，请自行合并 llama-mm 条目"
+else
+  mkdir -p "$HOME_DIR/.agents"
+  cat > "$AGENTS_MCP" <<'EOF'
+{
+  "mcpServers": {
+    "llama-mm": {
+      "command": "python",
+      "args": ["-m", "llama_multimodel_mcp.server"]
+    }
+  }
+}
+EOF
+  echo "[mcp.json] 已写入 $AGENTS_MCP（pi-mcp-adapter 等工具自动识别）"
+fi
+
 # 3. MCP server install + config
 echo
 echo "== MCP server =="

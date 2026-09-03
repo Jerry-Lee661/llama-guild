@@ -1,7 +1,7 @@
-# 安装指南 / Install Guide（五端）
+# 安装指南 / Install Guide（七端）
 
-> 五端共用同一个 MCP 后端。先完成"通用前置"，再做你要用的端的接入步骤。
-> All five targets share one MCP backend. Finish "Prerequisites" first, then
+> 七端共用同一个 MCP 后端（pi 与 omp 走共享约定，基本零额外安装）。先完成"通用前置"，再做你要用的端的接入步骤。
+> All seven targets share one MCP backend (pi and omp ride on shared conventions). Finish "Prerequisites" first, then
 > follow your tool's section.
 
 ## 通用前置 / Prerequisites
@@ -56,6 +56,8 @@ python mcp-server/tests/test_offline.py
 | Codex | → `~/.agents/skills`（local-executor 为 skill 形态） | 无子agent 系统→编排者内嵌规程 | `~/.codex/config.toml` | prompt 内嵌派发 |
 | VS Code | 三个 `.agent.md` chat-mode（复制进目标仓库） | chat-mode 即角色 | `<repo>/.vscode/mcp.json` | chat-mode 手动/子agent |
 | DSH | agent-presets（planner/executor persona） | preset 即角色 | cordis.patch.yml | preset + subagent |
+| pi | `~/.agents/skills`（安装器已覆盖）+ `~/.pi/agent/skills` | 无子agent 系统→编排者内嵌规程 | `~/.agents/mcp.json`（经 pi-mcp-adapter） | prompt 内嵌派发 |
+| omp (Oh My Pi) | 继承 `~/.claude/skills`（已覆盖） | 继承 + 内置 subagents | 继承 `.claude`/`.vscode` 的 MCP；原生 provider 见下 | 内置 subagents 派发 |
 
 ## 引导式部署 / Guided setup
 
@@ -107,6 +109,39 @@ MCP server 本体仍需按上文 `pip install -e` 一次。
 2. 把 `vscode/mcp.json.example` 复制为项目 `.vscode/mcp.json` 并编辑（command 指向装好本包的 python）
 3. 用法：`@Planner` 出契约 → `@Hybrid-executor` 统筹 → `@local-executor` 单任务执行
 4. LM Studio 用户：装 lmstudio-copilot-provider 做规划模型接入 + 本项目 MCP 管本地执行档，两者互补
+
+## pi (earendil-works/pi)
+
+- **Skills：零额外工作**。pi 按 Agent Skills 标准读取 `~/.agents/skills/`（安装器已覆盖）
+  与 `~/.pi/agent/skills/`，五个 SKILL.md 自动可见。
+- **MCP：pi 官方无内置 MCP**，走社区扩展：
+  ```bash
+  pi install npm:pi-mcp-adapter
+  ```
+  适配器读取标准 `~/.agents/mcp.json`（安装器在文件缺失时会自动写入 llama-mm 条目）。
+- **路由**：pi 无内置子agent——hybrid-orchestrate 按 Codex 同款路径，把 local-executor
+  规程内嵌进派发 prompt。
+
+## omp (Oh My Pi, omp.sh)
+
+- **Skills/MCP：继承制，零额外工作**。omp 首次运行即从 `.claude`、`.vscode` 等目录
+  继承 skills、rules 与 MCP server——装好 Claude Code 支持后 omp 自动可用。
+- **原生本地模型接入**（绕过 MCP 直连 llama-server）——`~/.omp/agent/models.yml`：
+  ```yaml
+  providers:
+    llama-quality:
+      baseUrl: http://127.0.0.1:8081/v1   # profiles.json 里 tier=quality 档的端口
+      api: openai-completions
+    llama-bulk:
+      baseUrl: http://127.0.0.1:8082/v1   # tier=bulk 档
+      api: openai-completions
+  ```
+  `~/.omp/agent/config.yml`：
+  ```yaml
+  modelRoles:
+    default: llama-quality/your-model-id
+  ```
+- **路由**：omp 内置 subagents，可按 Claude Code 同款方式派发 local-executor。
 
 ## DSH (deepseek-harness)
 
