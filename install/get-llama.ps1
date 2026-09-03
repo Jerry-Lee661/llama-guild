@@ -1,6 +1,6 @@
 ﻿# get-llama.ps1 - Download the latest official llama.cpp prebuilt binaries for
 # Windows (from ggml-org/llama.cpp GitHub releases). Genericized for
-# llama-multimodel-workflow; adapted from the author's personal updater.
+# llama-guild; adapted from the author's personal updater.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File get-llama.ps1                        # vulkan → ~\.llama-mm\bin

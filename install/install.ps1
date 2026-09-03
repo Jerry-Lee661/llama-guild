@@ -1,4 +1,4 @@
-# llama-multimodel-workflow installer (Windows).
+# llama-guild installer (Windows).
 # Copies skills/agents into ZCode / Claude Code / Codex user directories and
 # prints per-tool MCP registration snippets. Idempotent: re-running overwrites.
 
@@ -6,7 +6,7 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot   # script lives in <repo>\install
 $home_ = $env:USERPROFILE
 
-Write-Host "== llama-multimodel-workflow install ==" -ForegroundColor Cyan
+Write-Host "== llama-guild install ==" -ForegroundColor Cyan
 
 # 1. Skills -> ZCode / Claude Code / Codex
 $targets = @(

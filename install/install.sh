@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# llama-multimodel-workflow installer (macOS/Linux).
+# llama-guild installer (macOS/Linux).
 # Copies skills/agents into ZCode / Claude Code / Codex user directories and
 # prints per-tool MCP registration snippets. Idempotent.
 set -euo pipefail
@@ -7,7 +7,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HOME_DIR="${HOME}"
 
-echo "== llama-multimodel-workflow install =="
+echo "== llama-guild install =="
 
 # 1. Skills -> ZCode / Claude Code / Codex
 for dest in "$HOME_DIR/.zcode/skills" "$HOME_DIR/.claude/skills" "$HOME_DIR/.agents/skills"; do
