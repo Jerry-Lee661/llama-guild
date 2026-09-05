@@ -93,6 +93,14 @@ big context window; aim to never fill the one you have.
    load-unload cycle per tier per session.
 5. **Tight exceptions**: takeover by the session model only after 3 consecutive
    `LOCAL_MODEL_FAILED`, or an explicit user request — and report first.
+6. **Wide mode (contract-free light dispatch)**: four categories of mechanical
+   chores — research organizing, information extraction, content rewriting,
+   simple tool calls — dispatch to the local executor without a contract (text
+   work on the `bulk` tier, tool calls on `quality`). Boundaries: no business
+   implementation code, ≤24K tokens of input per pass, multi-step chains still
+   need a contract. Wide mode extends the local model from "only inside formal
+   contracts" to "also soaks up daily chores" — with the whitelist kept
+   mechanical, no subjective scope creep.
 
 > **Community evidence (2026-09, an LCZ forum thread on "one agent, two LLMs"):**
 > multiple practitioners independently report that skills / agent.md constraints
