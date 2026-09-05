@@ -20,7 +20,7 @@
 ### 3. Auditor 角色（成本中，差异化）
 里程碑节点由云端强模型对照契约（接线矩阵/接口契约）审计实际改动——验收层 L1
 契约扫描的 agent 化，与"验收绝不交给产出代码的模型"一致。
-落地：新增 `auditor` skill + 可选派发规则（hybrid-orchestrate 在 L1 阶段调用）。
+落地：新增 `auditor` skill + 可选派发规则（orchestrator 在 L1 阶段调用）。
 来源：Yu-Chen Chang（lcz.me）：Orchestrator/Specialist/Auditor 三权分立，Auditor 用最强模型。
 
 ### 4. RAG / repo 检索工具（成本高）
@@ -46,4 +46,4 @@
 
 ## 已完成
 
-- 0.1.0：五端支持、双 provider、默认档、setup-workflow 引导部署、安全加固（CI/路径安全/信任模型披露）。
+- 0.1.0：五端支持、双 provider、默认档、setup 引导部署、安全加固（CI/路径安全/信任模型披露）。

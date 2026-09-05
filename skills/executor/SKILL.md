@@ -1,10 +1,10 @@
 ---
-name: contract-execute
+name: executor
 description: 契约驱动的小步编码执行者：严格按 task-contract 的单个子任务执行，一次只改一个文件并立即验证。
 when_to_use: >-
   当用户给出"按契约执行某个子任务 / 执行最小任务包 / 执行第 N 个任务 / 按契约改这个文件"，
-  且已有 task-contract、目标是单文件落实时使用。多个子任务的统筹调度用 hybrid-orchestrate；
-  没有契约只有开发目标时先用 plan-contract。
+  且已有 task-contract、目标是单文件落实时使用。多个子任务的统筹调度用 orchestrator；
+  没有契约只有开发目标时先用 planner。
 ---
 
 > 来源：契约驱动多模型工作流的落实层。

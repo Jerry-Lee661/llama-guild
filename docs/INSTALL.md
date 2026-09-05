@@ -61,7 +61,7 @@ python mcp-server/tests/test_offline.py
 
 ## 引导式部署 / Guided setup
 
-以上 0-2 步可以交给 agent 代办：在 agent 会话里说 **"用 setup-workflow 帮我部署"**，
+以上 0-2 步可以交给 agent 代办：在 agent 会话里说 **"用 setup 帮我部署"**，
 它会检测硬件与后端、按显存推荐模型（参考 canirun.ai 数据）、生成 `~/.llama-mm` 配置、
 注册 MCP 并冒烟验证。
 
@@ -84,13 +84,13 @@ MCP server 本体仍需按上文 `pip install -e` 一次。
    ```
 3. 子智能体插件：设置 → 插件管理 → 发现 → "+" → 本地目录 → 选本仓库 `agents/` 目录
    （marketplace.json 贡献 `llama-router:local-executor`）
-4. 新开会话，`/plan-contract` → `/hybrid-orchestrate`
+4. 新开会话，`/planner` → `/orchestrator`
 
 ## Claude Code
 
 1. 运行 `bash install/install.sh`
 2. `claude mcp add llama-mm -- python -m llama_multimodel_mcp.server`
-3. 新开会话，用 plan-contract / hybrid-orchestrate skills
+3. 新开会话，用 planner / orchestrator skills
 
 ## Codex
 
@@ -119,7 +119,7 @@ MCP server 本体仍需按上文 `pip install -e` 一次。
   pi install npm:pi-mcp-adapter
   ```
   适配器读取标准 `~/.agents/mcp.json`（安装器在文件缺失时会自动写入 llama-mm 条目）。
-- **路由**：pi 无内置子agent——hybrid-orchestrate 按 Codex 同款路径，把 local-executor
+- **路由**：pi 无内置子agent——orchestrator 按 Codex 同款路径，把 local-executor
   规程内嵌进派发 prompt。
 
 ## omp (Oh My Pi, omp.sh)

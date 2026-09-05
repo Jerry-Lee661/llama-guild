@@ -1,10 +1,10 @@
 ---
-name: hybrid-orchestrate
+name: orchestrator
 description: 混合编排协调者：统筹已批准的 task-contract，拆分任务并把落实子任务派发给受限子agent（默认强制走本地模型），主模型只做规划与验收。
 when_to_use: >-
   当用户要求"统筹 / 调度 / 执行整个契约 / 开始落实 / 按契约推进 / 把契约里所有任务做完"，
-  即多子任务的全流程编排时使用。只做单个子任务用 contract-execute；还没有契约先用
-  plan-contract。本地模型经 llama-multimodel-mcp 的工具调度。
+  即多子任务的全流程编排时使用。只做单个子任务用 executor；还没有契约先用
+  planner。本地模型经 llama-multimodel-mcp 的工具调度。
 ---
 
 > 来源：契约驱动多模型工作流的编排层。

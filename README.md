@@ -13,7 +13,7 @@
 > | 老师傅 | 云端强模型（规划/接线/验收） |
 > | 学徒工（quality/bulk 两档） | 本地模型（按契约落实，一次一文件） |
 > | 出师考核 | L0-L4 工具验收阶梯 |
-> | 会首（主持行会，不动手刻字） | `hybrid-orchestrate` 编排 skill |
+> | 会首（主持行会，不动手刻字） | `orchestrator` 编排 skill |
 
 [中文说明](#中文) · [English](#english) · [Methodology 方法论](docs/WORKFLOW.zh.md) · [Install 安装](docs/INSTALL.md)
 
@@ -29,9 +29,9 @@ pieces so a coding agent (ZCode / Claude Code / Codex / VS Code / DSH, plus pi a
 omp via shared conventions) can actually use a local model as its implementation
 workforce:
 
-- **3 workflow skills** — `plan-contract` (the strong model produces a 9-section
-  `task-contract.md` instead of a vague plan), `contract-execute` (one file per
-  task, verify immediately), `hybrid-orchestrate` (dispatch discipline with a
+- **3 workflow skills** — `planner` (the strong model produces a 9-section
+  `task-contract.md` instead of a vague plan), `executor` (one file per
+  task, verify immediately), `orchestrator` (dispatch discipline with a
   **hard routing policy**: every task on the contract's list goes to the local
   executor — "too complex / system-level" is not an acceptable excuse).
 - **local-executor subagent** — forces code tokens through the local model via
@@ -81,12 +81,12 @@ bash install/install.sh        # or: powershell -File install\install.ps1
 
 The example `default` profile points at LM Studio's standard port 1234 — with
 LM Studio running and a model loaded, `chat` works with zero further config.
-Or skip this and let the agent install it for you: invoke the `setup-workflow`
+Or skip this and let the agent install it for you: invoke the `setup`
 skill (guided Q&A — backend, model recommendation by VRAM with canirun.ai-style
 reference data, config generation, MCP registration, smoke test).
 
-Then, in a new session of your agent tool: `plan-contract` → confirm the
-contract → `hybrid-orchestrate`. Full guide: [docs/INSTALL.md](docs/INSTALL.md).
+Then, in a new session of your agent tool: `planner` → confirm the
+contract → `orchestrator`. Full guide: [docs/INSTALL.md](docs/INSTALL.md).
 
 ### Positioning
 
@@ -137,8 +137,8 @@ MIT licensed. Windows-tested on llama.cpp b11xx; issues and profile contribution
 让它自由探索仓库就出事故。本项目把缺失的环节打包成型，让编码 agent（ZCode / Claude Code /
 Codex / VS Code / DSH）真正把本地模型当作落实生产力：
 
-- **3 个工作流 skill**——`plan-contract`（强模型产出 9 维度 `task-contract.md`，而非模糊意图）、
-  `contract-execute`（一次一文件、立即验证）、`hybrid-orchestrate`（派发纪律 +
+- **3 个工作流 skill**——`planner`（强模型产出 9 维度 `task-contract.md`，而非模糊意图）、
+  `executor`（一次一文件、立即验证）、`orchestrator`（派发纪律 +
   **硬路由策略**：契约清单上的任务一律派给本地执行者，"任务复杂/系统级"不是有效跳过理由）。
 - **local-executor 子智能体**——代码 token 强制经 MCP 走本地模型；子智能体只组装提示词、
   应用输出、跑验证。本地模型失败时报 `LOCAL_MODEL_FAILED`，绝不自己补写业务代码。
@@ -159,10 +159,10 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
 ```
 
 示例 `default` 档位指向 LM Studio 默认端口 1234——LM Studio 加载模型后无需任何
-编辑即可 `chat`。也可以什么都不改，直接让 agent 跑 `setup-workflow` skill：
+编辑即可 `chat`。也可以什么都不改，直接让 agent 跑 `setup` skill：
 问答式选后端、按显存推荐模型（参考 canirun.ai 数据）、生成配置并注册 MCP。
 
-新开会话后：`plan-contract` 出契约 → 确认 → `hybrid-orchestrate` 统筹落实。
+新开会话后：`planner` 出契约 → 确认 → `orchestrator` 统筹落实。
 完整指南见 [docs/INSTALL.md](docs/INSTALL.md)。
 
 ### 定位（与现有项目）
