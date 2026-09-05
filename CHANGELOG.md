@@ -11,6 +11,12 @@
   INSTALL, ROADMAP, methodology docs) updated. After upgrading, delete the old
   skill directories from your tool's skills folder (the installer copies, it
   does not remove) and reinstall.
+- Removed the standalone `executor` skill: with hard local routing, "session
+  model implements" is an exception path, not a separately triggerable skill.
+  Its discipline (one file, budgets, verify, 3-strike stop) lives on as the
+  "session mode (fallback)" section of `local-executor`, executed by the
+  orchestrator on approved takeover. Request types now map to exactly one
+  skill owner each (planner / local-executor / orchestrator / setup).
 
 ### Fixed
 

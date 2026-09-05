@@ -4,7 +4,7 @@ description: 规划阶段任务契约生成器：把已确认的开发目标整�
 when_to_use: >-
   当用户要求"出契约 / 规划任务 / 生成 task-contract / 写任务契约 / 把目标拆成可执行任务包"，
   且开发目标已确认时使用。模糊需求的前期澄清应走宿主的原生 Plan 模式；具体编码执行用
-  executor，整个契约的统筹调度用 orchestrator。
+  local-executor，整个契约的统筹调度用 orchestrator。
 ---
 
 > 来源：契约驱动多模型工作流（contract-driven multi-model workflow）的规划层。

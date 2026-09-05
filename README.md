@@ -29,9 +29,11 @@ pieces so a coding agent (ZCode / Claude Code / Codex / VS Code / DSH, plus pi a
 omp via shared conventions) can actually use a local model as its implementation
 workforce:
 
-- **3 workflow skills** — `planner` (the strong model produces a 9-section
-  `task-contract.md` instead of a vague plan), `executor` (one file per
-  task, verify immediately), `orchestrator` (dispatch discipline with a
+- **workflow skills** — `planner` (the strong model produces a 9-section
+  `task-contract.md` instead of a vague plan), `local-executor` (the single
+  implementation entry: one file per task, verify immediately; wide mode for
+  contract-free chores; session fallback when local is unavailable),
+  `orchestrator` (dispatch discipline with a
   **hard routing policy**: every task on the contract's list goes to the local
   executor — "too complex / system-level" is not an acceptable excuse).
 - **local-executor subagent** — forces code tokens through the local model via
@@ -138,7 +140,8 @@ MIT licensed. Windows-tested on llama.cpp b11xx; issues and profile contribution
 Codex / VS Code / DSH）真正把本地模型当作落实生产力：
 
 - **3 个工作流 skill**——`planner`（强模型产出 9 维度 `task-contract.md`，而非模糊意图）、
-  `executor`（一次一文件、立即验证）、`orchestrator`（派发纪律 +
+  `local-executor`（落实层唯一入口：一次一文件、立即验证；宽执行承接无契约杂务；
+  本地不可用时按会话 fallback 亲自落实）、`orchestrator`（派发纪律 +
   **硬路由策略**：契约清单上的任务一律派给本地执行者，"任务复杂/系统级"不是有效跳过理由）。
 - **local-executor 子智能体**——代码 token 强制经 MCP 走本地模型；子智能体只组装提示词、
   应用输出、跑验证。本地模型失败时报 `LOCAL_MODEL_FAILED`，绝不自己补写业务代码。

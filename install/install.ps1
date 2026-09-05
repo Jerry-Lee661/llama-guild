@@ -16,9 +16,11 @@ $targets = @(
 )
 foreach ($t in $targets) {
   foreach ($s in Get-ChildItem "$repo\skills" -Directory) {
+    $src = Join-Path $s.FullName "SKILL.md"
+    if (-not (Test-Path $src)) { continue }   # skip empty/phantom skill dirs
     $dst = Join-Path $t.dir $s.Name
     New-Item -ItemType Directory -Force -Path $dst | Out-Null
-    Copy-Item (Join-Path $s.FullName "SKILL.md") $dst -Force
+    Copy-Item $src $dst -Force
   }
   Write-Host "[skills] -> $($t.name): $($t.dir)"
 }

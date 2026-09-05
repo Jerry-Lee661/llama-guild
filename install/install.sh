@@ -13,6 +13,7 @@ echo "== llama-guild install =="
 for dest in "$HOME_DIR/.zcode/skills" "$HOME_DIR/.claude/skills" "$HOME_DIR/.agents/skills"; do
   for s in "$REPO"/skills/*/; do
     name="$(basename "$s")"
+    [ -f "$s/SKILL.md" ] || continue   # skip empty/phantom skill dirs
     mkdir -p "$dest/$name"
     cp "$s/SKILL.md" "$dest/$name/SKILL.md"
   done

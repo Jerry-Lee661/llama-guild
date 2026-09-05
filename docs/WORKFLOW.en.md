@@ -53,7 +53,7 @@ sweet spot; do not let `bulk` models do agentic tool calling.
   blockers & risks. One target file per task; interfaces come with local
   reference snippets, never "let the model explore"; unknowns are marked
   `[NEEDS VERIFICATION]`.
-- **Implement (local model + executor)** — one file at a time, from a minimal
+- **Implement (local model + local-executor)** — one file at a time, from a minimal
   task package (target file, interface contract, ≤5 snippets, narrowest verify
   command). Verify immediately; stop after 3 consecutive failures. System-level
   operations (install deps, edit configs, start services, wire plugins) are
@@ -95,7 +95,7 @@ big context window; aim to never fill the one you have.
    `LOCAL_MODEL_FAILED`, or an explicit user request — and report first.
 6. **Wide mode (contract-free light dispatch)**: four categories of mechanical
    chores — research organizing, information extraction, content rewriting,
-   simple tool calls — dispatch to the local executor without a contract (text
+   simple tool calls — dispatch to the local local-executor without a contract (text
    work on the `bulk` tier, tool calls on `quality`). Boundaries: no business
    implementation code, ≤24K tokens of input per pass, multi-step chains still
    need a contract. Wide mode extends the local model from "only inside formal
