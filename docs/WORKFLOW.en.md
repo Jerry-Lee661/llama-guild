@@ -53,6 +53,13 @@ sweet spot; do not let `bulk` models do agentic tool calling.
   blockers & risks. One target file per task; interfaces come with local
   reference snippets, never "let the model explore"; unknowns are marked
   `[NEEDS VERIFICATION]`.
+- **Implement (local model + local-executor)** — the executor passes a **confidence
+  gate** before building any prompt (self-answered high/medium/low + unclear
+  items, ≤3 lines); low confidence or blocking gaps return `NEEDS_CONTEXT`
+  instead of forcing code. Contracts may tag subtasks with a **return schema**
+  (default conclusion/evidence/follow-ups) so the orchestrator keeps only the
+  schema summary in working memory — the engineered answer to information
+  shuttling, the most expensive link in multi-model collaboration.
 - **Implement (local model + local-executor)** — one file at a time, from a minimal
   task package (target file, interface contract, ≤5 snippets, narrowest verify
   command). Verify immediately; stop after 3 consecutive failures. System-level

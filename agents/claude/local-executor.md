@@ -27,10 +27,11 @@ System-level operations are **in scope**: installing dependencies, editing confi
 
 1. **Ensure the instance runs**: check `server_status`; if the profile is down call `start_profile(profile_id)`. If the VRAM guard refuses, do **not** force — report the conflict verbatim.
 2. **Read context** (hard budget): locate with Grep before Read; ≤300 lines/12000 chars per read; ≤5 snippets for this task; never read the do-not-read list.
-3. **Build the local-model prompt** and send via `chat` (multi-turn / reasoning separation) or `complete` (single completion, sampling control). The prompt must contain: the task goal, the interface contract verbatim, the reference snippets, the output format ("output only the full code file content, no explanations"), and environment caveats (Windows paths/commands etc.).
-4. **Apply the output**: write the local model's code into the target file. Mechanical adaptation is allowed (align names/signatures to the contract, strip model commentary). **Large rewrites or writing business logic yourself are forbidden.**
-5. **Verify immediately**: run the narrowest verification command (`Bash`). On failure, read only nearby code around the error, fix the prompt, and go back to step 3. After 3 consecutive failures stop and report the raw error.
-6. **Record telemetry**: call `usage_stats` for this model's counters and include them in the report.
+3. **Pre-action confidence gate** (self-answered, ≤3 lines, no extra model calls): before building the prompt, answer two fixed questions — "How confident are you in this subtask (high/medium/low)?" and "What is still unclear?". High → continue; medium → continue but write the unclear items into the prompt as "unknowns"; low or a blocking gap → do not build the prompt; return to the orchestrator marked `NEEDS_CONTEXT` with the gap list.
+4. **Build the local-model prompt** and send via `chat` (multi-turn / reasoning separation) or `complete` (single completion, sampling control). The prompt must contain: the task goal, the interface contract verbatim, the reference snippets, the output format ("output only the full code file content, no explanations"), and environment caveats (Windows paths/commands etc.).
+5. **Apply the output**: write the local model's code into the target file. Mechanical adaptation is allowed (align names/signatures to the contract, strip model commentary). **Large rewrites or writing business logic yourself are forbidden.**
+6. **Verify immediately**: run the narrowest verification command (`Bash`). On failure, read only nearby code around the error, fix the prompt, and go back to step 4. After 3 consecutive failures stop and report the raw error. `NEEDS_CONTEXT` is a context gap, not a model failure — it does not consume the failure budget; the same gap is filled at most once.
+7. **Record telemetry**: call `usage_stats` for this model's counters and include them in the report.
 
 ## Hard rules
 
@@ -41,7 +42,10 @@ System-level operations are **in scope**: installing dependencies, editing confi
 
 ## Completion report (fixed format)
 
+When the contract task package carries a "return schema", prepend a `[回传]` block (fill per schema; evidence must cite file:line). For wide-mode text tasks the `[回传]` is the output summary.
+
 ```text
+[回传] <per contract schema; default: conclusion / evidence(file:line) / follow-ups>
 [文件] <actual path>
 [模型] <profile_id @ endpoint> | <prompt>N + <completion>N tokens | <tps> t/s
 [改动] <one sentence>
