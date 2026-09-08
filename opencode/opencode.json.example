@@ -1,0 +1,29 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "_comment": [
+    "llama-guild example config for OpenCode — DeepSeek V4 Pro + V4 Flash division of labor.",
+    "Setup: copy the agent/*.md files to <project>/.opencode/agent/ (or ~/.config/opencode/agent/),",
+    "set DEEPSEEK_API_KEY in your environment (or run `opencode` and use /connect → deepseek),",
+    "then verify exact model IDs with `opencode models` — adjust the two `model` fields if your",
+    "DeepSeek account exposes different IDs.",
+    "The mcp.llama-mm block is OPTIONAL: enable it only if you also run real local llama-server",
+    "profiles (see repo root README). The Pro/Flash split below is the all-cloud variant and works",
+    "without it."
+  ],
+  "provider": {
+    "deepseek": {
+      "options": {
+        "apiKey": "{env:DEEPSEEK_API_KEY}"
+      }
+    }
+  },
+  "model": "deepseek/deepseek-v4-pro",
+  "mcp": {
+    "llama-mm": {
+      "_comment": "OPTIONAL — enable to also drive real local llama-server profiles via MCP. Requires llama-multimodel-mcp installed (pip install -e mcp-server) and ~/.llama-mm/profiles.json configured.",
+      "type": "local",
+      "command": ["llama-multimodel-mcp"],
+      "enabled": false
+    }
+  }
+}

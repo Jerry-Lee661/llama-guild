@@ -25,8 +25,8 @@
 Local 27-35B models are competent *fill-in executors* but poor *self-driven
 engineers*: they follow contracts and reference snippets reliably, and fail
 when told to explore a repository freely. This project packages the missing
-pieces so a coding agent (ZCode / Claude Code / Codex / VS Code / DSH, plus pi and
-omp via shared conventions) can actually use a local model as its implementation
+pieces so a coding agent (ZCode / Claude Code / Codex / VS Code / DSH / opencode,
+plus pi and omp via shared conventions) can actually use a local model as its implementation
 workforce:
 
 - **workflow skills** — `planner` (the strong model produces a 9-section
@@ -97,7 +97,7 @@ contract → `orchestrator`. Full guide: [docs/INSTALL.md](docs/INSTALL.md).
 | [spec-kit](https://github.com/github/spec-kit) | spec-driven process | local-model routing (their #1504/#1784 do it by hand) |
 | [llama-swap](https://github.com/mostlygeek/llama-swap) | model hot-swap proxy | no workflow layer (contracts/routing/acceptance) |
 | BYOK provider plugins | model access | no division of labor |
-| **this repo** | **contract task packages + forced local routing + context budgets + acceptance ladder + profiled lifecycle (tuned args / spec-decode telemetry / token stats), packaged for 7 agent tools** | single-model inference access is left to BYOK plugins (complementary) |
+| **this repo** | **contract task packages + forced local routing + context budgets + acceptance ladder + profiled lifecycle (tuned args / spec-decode telemetry / token stats), packaged for 8 agent tools** | single-model inference access is left to BYOK plugins (complementary) |
 
 ### Providers
 
@@ -126,7 +126,7 @@ verifiable install.
 ### Docs
 
 - [Methodology (EN core)](docs/WORKFLOW.en.md) / [方法论（中文完整版）](docs/WORKFLOW.zh.md)
-- [Install (7 targets)](docs/INSTALL.md) · [Reference baselines 基线](docs/BENCHMARKS.zh.md) · [DSH](dsh/README.md) · [MCP server](mcp-server/README.md)
+- [Install (8 targets)](docs/INSTALL.md) · [Reference baselines 基线](docs/BENCHMARKS.zh.md) · [DSH](dsh/README.md) · [MCP server](mcp-server/README.md)
 
 MIT licensed. Windows-tested on llama.cpp b11xx; issues and profile contributions welcome.
 
@@ -137,7 +137,7 @@ MIT licensed. Windows-tested on llama.cpp b11xx; issues and profile contribution
 
 本地 27-35B 模型是合格的**填空执行者**，不是**自驱工程师**：给契约和参考片段它很可靠，
 让它自由探索仓库就出事故。本项目把缺失的环节打包成型，让编码 agent（ZCode / Claude Code /
-Codex / VS Code / DSH）真正把本地模型当作落实生产力：
+Codex / VS Code / DSH / opencode，另有 pi 与 omp 走共享约定）真正把本地模型当作落实生产力：
 
 - **3 个工作流 skill**——`planner`（强模型产出 9 维度 `task-contract.md`，而非模糊意图）、
   `local-executor`（落实层唯一入口：一次一文件、立即验证；宽执行承接无契约杂务；
@@ -195,7 +195,7 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
 
 ### 文档
 
-[方法论（中文完整版）](docs/WORKFLOW.zh.md) · [安装（七端）](docs/INSTALL.md) ·
+[方法论（中文完整版）](docs/WORKFLOW.zh.md) · [安装（八端）](docs/INSTALL.md) ·
 [参考基线](docs/BENCHMARKS.zh.md) · [DSH 接入](dsh/README.md) · [MCP server](mcp-server/README.md)
 
 MIT 许可。Windows + llama.cpp b11xx 实测；欢迎 issue 与档位贡献。

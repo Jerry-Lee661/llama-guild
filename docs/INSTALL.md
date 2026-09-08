@@ -1,7 +1,7 @@
-# 安装指南 / Install Guide（七端）
+# 安装指南 / Install Guide（八端）
 
-> 七端共用同一个 MCP 后端（pi 与 omp 走共享约定，基本零额外安装）。先完成"通用前置"，再做你要用的端的接入步骤。
-> All seven targets share one MCP backend (pi and omp ride on shared conventions). Finish "Prerequisites" first, then
+> 八端共用同一个 MCP 后端（pi 与 omp 走共享约定；opencode 走 DeepSeek V4 Pro/Flash 云端分工，本地模型可选）。先完成"通用前置"，再做你要用的端的接入步骤。
+> All eight targets share one MCP backend (pi and omp ride on shared conventions; opencode runs the DeepSeek V4 Pro/Flash cloud split with local models optional). Finish "Prerequisites" first, then
 > follow your tool's section.
 
 ## 通用前置 / Prerequisites
@@ -58,6 +58,7 @@ python mcp-server/tests/test_offline.py
 | DSH | agent-presets（planner/executor persona） | preset 即角色 | cordis.patch.yml | preset + subagent |
 | pi | `~/.agents/skills`（安装器已覆盖）+ `~/.pi/agent/skills` | 无子agent 系统→编排者内嵌规程 | `~/.agents/mcp.json`（经 pi-mcp-adapter） | prompt 内嵌派发 |
 | omp (Oh My Pi) | 继承 `~/.claude/skills`（已覆盖） | 继承 + 内置 subagents | 继承 `.claude`/`.vscode` 的 MCP；原生 provider 见下 | 内置 subagents 派发 |
+| opencode | 无 skills 概念→orchestrator/executor 双 agent 定义（复制进 `~/.config/opencode/agent/` 或项目 `.opencode/agent/`） | agent 即角色（primary=orchestrator，subagent=executor） | `opencode.json` 的 `mcp` 键（可选） | primary 硬路由派发 subagent |
 
 ## 引导式部署 / Guided setup
 
@@ -142,6 +143,15 @@ MCP server 本体仍需按上文 `pip install -e` 一次。
     default: llama-quality/your-model-id
   ```
 - **路由**：omp 内置 subagents，可按 Claude Code 同款方式派发 local-executor。
+
+## opencode
+
+全云端分工形态：**DeepSeek V4 Pro（primary `orchestrator`）规划/派发/审计/验收，V4 Flash（subagent `executor`）单任务落实与机械杂务**——不需要本地 GPU。
+
+1. `opencode` 内 `/connect` 选 deepseek 配置 API key（或导出 `DEEPSEEK_API_KEY`）
+2. 复制 `opencode/agent/*.md` 到 `~/.config/opencode/agent/`（全局）或项目 `.opencode/agent/`
+3. 把 `opencode/opencode.json.example` 的 provider/model/mcp 合并进对应 `opencode.json`；用 `opencode models` 核对你账号的准确模型 ID
+4. 可选：启用 `mcp.llama-mm` 接真实本地档位（详见 [opencode/README.md](../opencode/README.md)，含上游 subagent 模型继承的已知坑）
 
 ## DSH (deepseek-harness)
 

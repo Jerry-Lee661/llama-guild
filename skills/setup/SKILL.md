@@ -23,7 +23,7 @@ when_to_use: >-
 | Ollama | 探测 `http://127.0.0.1:11434` | 通 → 后端候选 |
 | llama.cpp 二进制 | `~/.llama-mm/bin/current/` 是否存在 | 有 → 复用 |
 | 已有配置 | `~/.llama-mm/profiles.json` | 存在 → 询问"重配还是保留追加" |
-| 宿主工具 | `~/.zcode`、`~/.claude`、`~/.codex`、`~/.pi`、`~/.omp` 目录存在性 | 决定第 4 步注册哪些端 |
+| 宿主工具 | `~/.zcode`、`~/.claude`、`~/.codex`、`~/.pi`、`~/.omp`、`~/.config/opencode` 目录存在性 | 决定第 4 步注册哪些端 |
 
 ## 第 1 步：问答回合——后端
 
