@@ -74,6 +74,21 @@ python mcp-server/tests/test_offline.py
 脚本做的事：复制 skills 到三个用户目录、复制 Claude agent、打印各端 MCP 注册片段。
 MCP server 本体仍需按上文 `pip install -e` 一次。
 
+## 触发硬开关 / Trigger hard switch
+
+skill 是模型自动触发的——不想让工作流在某个时期抢触发（比如只是写个日常计划也被拉进
+契约流程），用硬开关把 4 个 skill 从模型上下文里整个摘掉（零 token、零触发）：
+
+```powershell
+powershell -File install\guild-switch.ps1 off      # 关（user 级，立即生效于新会话）
+powershell -File install\guild-switch.ps1 status   # 查看逐技能状态
+powershell -File install\guild-switch.ps1 on       # 恢复
+# -Scope workspace 则写入 <repo>/.zcode/config.json，按项目生效
+```
+
+开关只作用于 ZCode（其 config 有 skillOverrides 机制）；其他工具依赖 skill 内置的
+触发词负面清单降噪。注意：off 之后 `/planner` 等也会从 / 菜单消失——这是硬开关的含义。
+
 ## ZCode
 
 1. 运行 `install\install.ps1`（skills + agent 已就位）

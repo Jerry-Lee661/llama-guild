@@ -61,6 +61,8 @@ when_to_use: >-
 
 ## 第 4 步：注册 MCP + 安装 skills（按第 0 步检测到的宿主，逐端执行）
 
+ZCode 端完成后告知用户：skill 默认自动触发，可随时用 `install/guild-switch.ps1 off|on` 硬开关整体摘除/恢复（`-Scope workspace` 按项目生效）。
+
 | 宿主 | MCP 注册 | 说明 |
 |---|---|---|
 | ZCode | 合并到 `~/.zcode/cli/config.json`：`{"mcp":{"servers":{"llama-mm":{"command":"<python>","args":["-m","llama_multimodel_mcp.server"]}}}}`；子agent 插件：设置→插件管理→发现→"+"→选本仓库 `agents/` 目录 | skills 复制到 `~/.zcode/skills` |

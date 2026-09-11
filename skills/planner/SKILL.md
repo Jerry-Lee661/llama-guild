@@ -2,9 +2,11 @@
 name: planner
 description: 规划阶段任务契约生成器：把已确认的开发目标整理成可交给执行agent的 task-contract.md（9 维度契约），只规划不写码。
 when_to_use: >-
-  当用户要求"出契约 / 规划任务 / 生成 task-contract / 写任务契约 / 把目标拆成可执行任务包"，
-  且开发目标已确认时使用。模糊需求的前期澄清应走宿主的原生 Plan 模式；具体编码执行用
-  local-executor，整个契约的统筹调度用 orchestrator。
+  仅当用户**明确要求本工作流的契约产出**——"出契约 / 生成 task-contract 文件 / 把目标拆成
+  可执行任务包"，且开发目标已确认时使用。负面清单（不触发本 skill，直接完成请求即可）：
+  用户只是想要一份计划、笔记、todo 或方案落盘；只是提到 task-contract 字样但并非要契约
+  流程；讨论规划思路而未确认开发目标。模糊需求的前期澄清走宿主的原生 Plan 模式；具体
+  编码执行用 local-executor，整个契约的统筹调度用 orchestrator。
 ---
 
 > 来源：契约驱动多模型工作流（contract-driven multi-model workflow）的规划层。

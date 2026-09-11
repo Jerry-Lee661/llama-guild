@@ -83,6 +83,9 @@ bash install/install.sh        # or: powershell -File install\install.ps1
 
 The example `default` profile points at LM Studio's standard port 1234 — with
 LM Studio running and a model loaded, `chat` works with zero further config.
+Skills auto-trigger by intent; if you ever want them fully off (zero context,
+zero triggering), flip the hard switch: `install/guild-switch.ps1 off`
+(+ `.sh` for POSIX).
 Or skip this and let the agent install it for you: invoke the `setup`
 skill (guided Q&A — backend, model recommendation by VRAM with canirun.ai-style
 reference data, config generation, MCP registration, smoke test).
