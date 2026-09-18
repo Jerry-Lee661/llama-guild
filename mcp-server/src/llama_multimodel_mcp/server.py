@@ -179,7 +179,7 @@ def _profile_or_default(profile_id: str | None) -> Profile:
 @mcp.tool()
 def start_profile(profile_id: str | None = None, ctx: int | None = None,
                   extra_args: list[str] | None = None, force: bool = False,
-                  wait_seconds: float = 300.0) -> dict:
+                  wait: bool = True, wait_seconds: float = 300.0) -> dict:
     """按档位启动 llama-server（ctx 可覆盖；profile_id 省略时用 profiles 的 default 档）。端口被占或 VRAM 超预算时拒绝（force=true 越过 VRAM 限制）。"""
     p = _profile_or_default(profile_id)
     require(p.provider, "start")
@@ -209,12 +209,23 @@ def start_profile(profile_id: str | None = None, ctx: int | None = None,
             f"profile {p.id} 定义不完整：model 字段为空且 args 里没有 -m/--model，"
             "拒绝启动（否则会静默起成无模型的 router 模式）")
     proc = process_mgr.start_profile(p.exe, final_args, p.id, extra_path)
-    h = process_mgr.wait_health(port, wait_seconds)
     out = {"profile": p.id, "pid": proc.pid, "port": port, "ctx": ctx or p.ctx,
-           "log": process_mgr.log_path_for(p.id), "health": h["status"]}
+           "log": process_mgr.log_path_for(p.id)}
+    if not wait:
+        out["health"] = "starting"
+        out["hint"] = "后台加载中；用 server_status 轮询，stop_profile 可终止"
+        return out
+    h = process_mgr.wait_health(port, wait_seconds)
+    out["health"] = h["status"]
     if h["status"] != "ok":
         out["log_tail"] = _log_tail(process_mgr.log_path_for(p.id), 30)
-        out["hint"] = "大模型加载可能超过等待时间，可稍后用 server_status 再查"
+        if process_mgr.is_alive(proc.pid):
+            out["hint"] = ("仍在后台加载（超过等待时间）；用 server_status 轮询，"
+                           "或 stop_profile 终止")
+        else:
+            process_mgr.forget(proc.pid)
+            out["reclaimed"] = True
+            out["hint"] = "进程在加载期间自行退出（崩溃/参数错误），已清理跟踪状态；详见日志"
     return out
 
 
@@ -245,9 +256,10 @@ def stop_all() -> dict:
 
 @mcp.tool()
 def switch_profile(profile_id: str | None = None, ctx: int | None = None, force: bool = False,
-                   wait_seconds: float = 300.0) -> dict:
+                   wait: bool = False, wait_seconds: float = 300.0) -> dict:
     """切换档位：停掉目标 GPU 池（profile.device）上的 llama-server 再启动目标档，
-    其他池的实例不受影响（省略 profile_id 时用 default 档）。"""
+    其他池的实例不受影响（省略 profile_id 时用 default 档）。
+    默认 wait=false 非阻塞返回（用 server_status 轮询就绪）；wait=true 才等健康检查。"""
     p = _profile_or_default(profile_id)
     require(p.provider, "switch")
     if p.remote:
@@ -259,7 +271,10 @@ def switch_profile(profile_id: str | None = None, ctx: int | None = None, force:
     for pid in victims:
         process_mgr.stop_tree(pid)
     time.sleep(1)
-    started = start_profile(profile_id, ctx=ctx, force=force, wait_seconds=wait_seconds)
+    started = start_profile(profile_id, ctx=ctx, force=force, wait=wait,
+                            wait_seconds=wait_seconds)
+    started["note"] = ("非阻塞返回；用 server_status 轮询就绪" if not wait
+                       else "已等待健康检查通过")
     return {"stopped_pids": victims, "device_pool": pool, "started": started}
 
 

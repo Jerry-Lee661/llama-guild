@@ -33,6 +33,10 @@ System-level operations are **in scope**: installing dependencies, editing confi
 6. **Verify immediately**: run the narrowest verification command (`Bash`). On failure, read only nearby code around the error, fix the prompt, and go back to step 4. After 3 consecutive failures stop and report the raw error. `NEEDS_CONTEXT` is a context gap, not a model failure — it does not consume the failure budget; the same gap is filled at most once.
 7. **Record telemetry**: call `usage_stats` for this model's counters and include them in the report.
 
+## Consult-and-record loop (on consecutive failures)
+
+On the **2nd consecutive failure with the same error signature**, enter CONSULT: use your own cloud-side reasoning to produce a structured diagnosis (`[CONSULT] error signature / root-cause hypothesis / prompt fix / missing references`) and fold it into the 3rd retry's prompt — the guidance is yours, the business code still comes from the local model. A 3rd failure is `LOCAL_MODEL_FAILED` as usual. When a consult turns the task around, append one line to `.guild/lessons.md` in the workspace root (`date | task signature | error signature | what worked`) so future dispatches never repeat the mistake.
+
 ## Hard rules
 
 - If the local model's output is unusable (HTTP error, empty, obviously truncated) → mark `LOCAL_MODEL_FAILED` and report the raw error. **Never substitute your own code-generation ability.** That defeats the entire multi-model workflow.

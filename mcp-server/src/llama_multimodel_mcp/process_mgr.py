@@ -174,6 +174,20 @@ def start_profile(exe: str, args: list[str], profile_id: str,
     return _started[profile_id]
 
 
+def is_alive(pid: int) -> bool:
+    import psutil
+    try:
+        return psutil.Process(pid).is_running() and psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        return False
+
+
+def forget(pid: int) -> None:
+    """Drop a tracked pid from the started-map (process already exited)."""
+    for k in [k for k, v in _started.items() if v.pid == pid]:
+        del _started[k]
+
+
 def stop_tree(pid: int) -> bool:
     try:
         proc = psutil.Process(pid)

@@ -4,6 +4,16 @@
 
 ### Added
 
+- workflow: **consult-and-record loop** in local-executor — on the 2nd
+  consecutive failure with the same error signature, the executor produces a
+  structured cloud-side diagnosis ([CONSULT]) and folds it into the final
+  retry (guidance only; business code still local); a turned-around task is
+  recorded as one line in workspace `.guild/lessons.md`, which orchestrators
+  consult when building later task packages.
+- mcp: `switch_profile`/`start_profile` non-blocking `wait=false` dispatch +
+  managed failure path (exited children reclaimed, loading children reported
+  with poll/stop guidance) — resolves both 0.1.1 known limitations.
+
 - hard switch for skill triggering: `install/guild-switch.ps1|.sh` writes ZCode
   `skillOverrides` (path-keyed `enable:false`) in the user or workspace config,
   removing the four workflow skills from model context entirely (zero tokens,
@@ -81,14 +91,15 @@
   Structured `model`/`port` fields are now injected when missing, and
   `start_profile` refuses to launch a profile that has no model token at all.
 
-### Known limitations
+### Fixed (late)
 
-- `switch_profile` blocks the whole MCP server while `wait_health` polls
-  (up to `wait_seconds`); concurrent tool calls time out during the wait.
-- A failed `start_profile` still leaves the launched llama-server child running
-  (e.g. model loading exceeds `wait_seconds`); the health-check failure path
-  does not reclaim the subprocess yet. (The empty-router-on-8080 variant is
-  fixed above; other launch failures can still orphan a child.)
+- `switch_profile` no longer blocks the MCP server during the health wait:
+  it now returns immediately after dispatching the new instance (wait=false
+  default; poll `server_status`). `start_profile` gains the same `wait` knob.
+- `start_profile` failure path is now managed: an exited child is reported
+  and its tracking state reclaimed; a still-loading child is reported as
+  background-loading with explicit poll/stop guidance instead of being
+  silently orphaned.
 
 ## 0.1.0 (initial public preview)
 

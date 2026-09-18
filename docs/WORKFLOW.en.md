@@ -59,7 +59,13 @@ sweet spot; do not let `bulk` models do agentic tool calling.
   instead of forcing code. Contracts may tag subtasks with a **return schema**
   (default conclusion/evidence/follow-ups) so the orchestrator keeps only the
   schema summary in working memory — the engineered answer to information
-  shuttling, the most expensive link in multi-model collaboration.
+  shuttling, the most expensive link in multi-model collaboration. The layer
+  also runs a **consult-and-record loop**: on the 2nd consecutive failure with
+  the same error signature the executor enters CONSULT (cloud-side diagnosis
+  produces prompt fixes; the local model regenerates under that guidance), and
+  a turned-around task appends one line to `.guild/lessons.md` — orchestrators
+  grep it when building later task packages, so the same pit is never stepped
+  in twice.
 - **Implement (local model + local-executor)** — one file at a time, from a minimal
   task package (target file, interface contract, ≤5 snippets, narrowest verify
   command). Verify immediately; stop after 3 consecutive failures. System-level
