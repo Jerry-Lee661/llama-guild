@@ -3,6 +3,7 @@
   "server_exe": "llama-server",
   "host": "127.0.0.1",
   "vram_budget_gb": 20,
+  "vram_budget_by_device": {},
   "stats_enabled": true,
   "stats_path": null,
   "log_dir": null,

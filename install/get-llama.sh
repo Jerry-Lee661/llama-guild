@@ -51,37 +51,48 @@ for rel in json.load(sys.stdin):
 done
 if [ -z "$TAG" ]; then echo "[get-llama] 未找到匹配 $ASSET_RE 的资产"; exit 1; fi
 
-VER="${TAG%% *}"
+VER="${TAG%% *}"; VER="${VER#b}"   # b4233 -> 4233（版本目录统一不带 b 前缀）
 URL="${TAG#* }"
 ROLL="$INSTALL_DIR/current"
+VERDIR="$INSTALL_DIR/b$VER"
+SYNC_MARK="$INSTALL_DIR/.current"
 
-if [ -f "$INSTALL_DIR/.version" ] && [ "$(cat "$INSTALL_DIR/.version")" = "$VER" ] \
+# .current 记录已同步进 current/ 的版本；只完成下载不算最新（可能因 server
+# 运行中跳过了同步），否则"停机后重跑同步"永远不会发生。
+if [ -f "$SYNC_MARK" ] && [ "$(cat "$SYNC_MARK")" = "$VER" ] \
    && [ -x "$ROLL/llama-server" ]; then
   echo "[get-llama] 已是最新（$TAG），跳过"; exit 0
 fi
 
-TMP=$(mktemp -d)
-echo "[get-llama] 下载 $URL ..."
-curl -L -sS -o "$TMP/llama.zip" "$URL"
-if [ -n "$EXPECTED_SHA256" ]; then
-  SHA=$(sha256sum "$TMP/llama.zip" | cut -d' ' -f1)
-  if [ "$SHA" != "$(echo "$EXPECTED_SHA256" | tr 'A-Z' 'a-z')" ]; then
-    echo "[get-llama] SHA256 mismatch: $SHA"; exit 1
+if [ ! -x "$VERDIR/llama-server" ]; then
+  TMP=$(mktemp -d)
+  echo "[get-llama] 下载 $URL ..."
+  curl -L -sS -o "$TMP/llama.zip" "$URL"
+  if [ -n "$EXPECTED_SHA256" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then
+      SHA=$(sha256sum "$TMP/llama.zip" | cut -d' ' -f1)
+    else
+      SHA=$(shasum -a 256 "$TMP/llama.zip" | cut -d' ' -f1)
+    fi
+    if [ "$SHA" != "$(echo "$EXPECTED_SHA256" | tr 'A-Z' 'a-z')" ]; then
+      echo "[get-llama] SHA256 mismatch: $SHA"; exit 1
+    fi
+    echo "[get-llama] SHA256 verified"
   fi
-  echo "[get-llama] SHA256 verified"
-fi
-mkdir -p "$INSTALL_DIR/b$VER"
-unzip -oq "$TMP/llama.zip" -d "$INSTALL_DIR/b$VER"
-rm -rf "$TMP"
-if [ ! -f "$INSTALL_DIR/b$VER/llama-server" ]; then
-  echo "[get-llama] 解压后未找到 llama-server，疑似 zip 结构变化，中止"; exit 1
-fi
-if pgrep -x llama-server >/dev/null 2>&1; then
-  echo "[get-llama] llama-server 正在运行，未同步 current；停机后重跑即可同步"
-else
-  mkdir -p "$ROLL"
-  cp -R "$INSTALL_DIR/b$VER/." "$ROLL/"
-  echo "[get-llama] 已同步到 $ROLL（current = $VER）"
+  mkdir -p "$VERDIR"
+  unzip -oq "$TMP/llama.zip" -d "$VERDIR"
+  rm -rf "$TMP"
+  if [ ! -f "$VERDIR/llama-server" ]; then
+    echo "[get-llama] 解压后未找到 llama-server，疑似 zip 结构变化，中止"; exit 1
+  fi
 fi
 echo "$VER" > "$INSTALL_DIR/.version"
-echo "[get-llama] 完成: b$VER。config.json 里把 server_exe 指向 $ROLL/llama-server"
+if pgrep -x llama-server >/dev/null 2>&1; then
+  echo "[get-llama] llama-server 正在运行，未同步 current；停机后重跑即可同步（不会重复下载）"
+else
+  mkdir -p "$ROLL"
+  cp -R "$VERDIR/." "$ROLL/"
+  echo "$VER" > "$SYNC_MARK"
+  echo "[get-llama] 已同步到 $ROLL（current = $TAG）"
+fi
+echo "[get-llama] 完成: $TAG。config.json 里把 server_exe 指向 $ROLL/llama-server"

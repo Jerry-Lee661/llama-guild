@@ -21,15 +21,25 @@ class Profile:
     mmproj: str | None = None
     port: int | None = None
     ctx: int | None = None
-    base_url: str | None = None             # openai-compatible
+    base_url: str | None = None             # openai-compatible, or llama-server with host
+    host: str | None = None                 # llama-server on another machine -> remote
+    remote: bool = False                    # lifecycle tools refuse remote profiles
+    device: str = "default"                 # GPU pool: gpu0 / gpu1 / default / ...
     flags: dict = field(default_factory=dict)
     raw_args: list[str] = field(default_factory=list)  # launch tokens after exe
     description: str = ""
     weight_gb: float | None = None
+    vram_gb: float | None = None            # VRAM budget share; falls back to weight_gb
     removed: bool = False
     needs_rocm_path: bool = False
     orphaned_flags: list[str] = field(default_factory=list)
     line: int = 0
+
+
+def _host_is_remote(url: str) -> bool:
+    authority = url.split("://", 1)[-1].split("/", 1)[0]
+    host = authority.rsplit(":", 1)[0].strip("[]")
+    return not (host == "localhost" or host == "::1" or host.startswith("127."))
 
 
 def _from_json(pid: str, d: dict) -> Profile:
@@ -53,6 +63,14 @@ def _from_json(pid: str, d: dict) -> Profile:
             raw += [k] if v is None else [k, str(v)]
     port = d.get("port")
     base_url = d.get("base_url")
+    host = d.get("host")
+    if provider == "llama-server" and host:
+        h = str(host)
+        if "://" not in h:
+            h = "http://" + h
+        base_url = f"{h.rstrip('/') }:{port if port is not None else 8080}"
+    remote = bool(provider == "llama-server" and base_url
+                  and _host_is_remote(str(base_url)))
     if provider == "openai-compatible" and not base_url:
         base_url = f"http://127.0.0.1:{port or 8080}"
     if provider == "openai-compatible" and port is None and base_url:
@@ -66,8 +84,11 @@ def _from_json(pid: str, d: dict) -> Profile:
         model=os.path.expandvars(os.path.expanduser(d.get("model") or "")) if provider == "llama-server" else (d.get("model_id") or ""),
         draft_model=d.get("draft_model"), mmproj=d.get("mmproj"),
         port=port, ctx=d.get("ctx"), base_url=base_url,
+        host=str(host) if host else None, remote=remote,
+        device=d.get("device") or "default",
         flags=flags, raw_args=raw, description=d.get("description", ""),
-        weight_gb=d.get("weight_gb"), removed=bool(d.get("removed")),
+        weight_gb=d.get("weight_gb"), vram_gb=d.get("vram_gb"),
+        removed=bool(d.get("removed")),
     )
 
 

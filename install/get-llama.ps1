@@ -13,7 +13,9 @@
 
 param(
     [string]$Backend = 'vulkan',                # asset pattern part: vulkan | cpu | cuda12.4 | ...
-    [string]$InstallDir = "$env:USERPROFILE\.llama-mm\bin"
+    [string]$InstallDir = "$env:USERPROFILE\.llama-mm\bin",
+    [string]$Version = '',                      # pin a tag, e.g. b1234
+    [string]$ExpectedSha256 = ''                # optional zip checksum for verifiable install
 )
 
 $ErrorActionPreference = 'Stop'
@@ -21,6 +23,7 @@ $ErrorActionPreference = 'Stop'
 
 $repo      = 'ggml-org/llama.cpp'
 $stateFile = Join-Path $InstallDir '.version'
+$syncFile  = Join-Path $InstallDir '.current'
 $rollDir   = Join-Path $InstallDir 'current'
 $assetRe   = "bin-win-$Backend-x64\.zip$"
 
@@ -38,43 +41,47 @@ if (-not $release) {
 $tag = $release.tag_name
 $ver = $tag -replace '^b', ''
 
-$installed = if (Test-Path $stateFile) { (Get-Content $stateFile -Raw).Trim() } else { '' }
-if ($installed -eq $ver -and (Test-Path (Join-Path $rollDir 'llama-server.exe'))) {
+# .current records the version actually synced into current\; a download that
+# skipped the sync (server was running) must not count as up-to-date.
+$synced = if (Test-Path $syncFile) { (Get-Content $syncFile -Raw).Trim() } else { '' }
+if ($synced -eq $ver -and (Test-Path (Join-Path $rollDir 'llama-server.exe'))) {
     Write-Host "[get-llama] 已是最新（$tag），跳过"; exit 0
 }
 
-$asset = $release.assets | Where-Object { $_.name -match $assetRe } | Select-Object -First 1
-$zip = Join-Path $env:TEMP $asset.name
-Write-Host "[get-llama] 下载 $($asset.name) ..."
-if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-    curl.exe -L -sS -o $zip $asset.browser_download_url
-}
-if (-not (Test-Path $zip) -or (Get-Item $zip).Length -eq 0) {
-    Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -UseBasicParsing
-}
-if ($ExpectedSha256) {
-    $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-    if ($sha -ne $ExpectedSha256.ToLower()) {
-        Write-Host "[get-llama] SHA256 mismatch: $sha"; exit 1
-    }
-    Write-Host "[get-llama] SHA256 verified"
-}
-
 $verDir = Join-Path $InstallDir "b$ver"
-New-Item -ItemType Directory -Force -Path $verDir | Out-Null
-Write-Host "[get-llama] 解压到 $verDir ..."
-Expand-Archive -Path $zip -DestinationPath $verDir -Force
-Remove-Item $zip -Force -ErrorAction SilentlyContinue
 if (-not (Test-Path (Join-Path $verDir 'llama-server.exe'))) {
-    Write-Host "[get-llama] 解压后未找到 llama-server.exe，疑似 zip 结构变化，中止"; exit 1
+    $asset = $release.assets | Where-Object { $_.name -match $assetRe } | Select-Object -First 1
+    $zip = Join-Path $env:TEMP $asset.name
+    Write-Host "[get-llama] 下载 $($asset.name) ..."
+    if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+        curl.exe -L -sS -o $zip $asset.browser_download_url
+    }
+    if (-not (Test-Path $zip) -or (Get-Item $zip).Length -eq 0) {
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -UseBasicParsing
+    }
+    if ($ExpectedSha256) {
+        $sha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+        if ($sha -ne $ExpectedSha256.ToLower()) {
+            Write-Host "[get-llama] SHA256 mismatch: $sha"; exit 1
+        }
+        Write-Host "[get-llama] SHA256 verified"
+    }
+    New-Item -ItemType Directory -Force -Path $verDir | Out-Null
+    Write-Host "[get-llama] 解压到 $verDir ..."
+    Expand-Archive -Path $zip -DestinationPath $verDir -Force
+    Remove-Item $zip -Force -ErrorAction SilentlyContinue
+    if (-not (Test-Path (Join-Path $verDir 'llama-server.exe'))) {
+        Write-Host "[get-llama] 解压后未找到 llama-server.exe，疑似 zip 结构变化，中止"; exit 1
+    }
 }
+Set-Content -Path $stateFile -Value $ver -Encoding ASCII
 
 if (Get-Process -Name 'llama-server' -ErrorAction SilentlyContinue) {
-    Write-Host "[get-llama] llama-server 正在运行，未同步 current 目录；停机后重跑即可同步"
+    Write-Host "[get-llama] llama-server 正在运行，未同步 current 目录；停机后重跑即可同步（不会重复下载）"
 } else {
     New-Item -ItemType Directory -Force -Path $rollDir | Out-Null
     Copy-Item (Join-Path $verDir '*') $rollDir -Recurse -Force
+    Set-Content -Path $syncFile -Value $ver -Encoding ASCII
     Write-Host "[get-llama] 已同步到 $rollDir（current = $tag）"
 }
-Set-Content -Path $stateFile -Value $ver -Encoding ASCII
 Write-Host "[get-llama] 完成: $tag。config.json 里把 server_exe 指向 $rollDir\llama-server.exe"

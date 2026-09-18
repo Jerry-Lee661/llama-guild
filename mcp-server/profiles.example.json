@@ -1,5 +1,5 @@
 {
-  "_comment": "llama-multimodel-mcp profiles. Copy to ~/.llama-mm/profiles.json (or point config.profiles_file at it). The top-level 'default' profile is used whenever a tool call omits profile_id — the example defaults to LM Studio's standard port 1234, so if LM Studio is running with a model loaded, chat/usage_stats work zero-config. provider: 'llama-server' = full lifecycle (start/stop/bench/telemetry, needs model paths); 'openai-compatible' = inference + stats against a running server (LM Studio :1234, Ollama :11434/v1, vLLM, llama-swap). tier drives workflow routing: 'quality' = high-quality executor, 'bulk' = fast/rough executor.",
+  "_comment": "llama-multimodel-mcp profiles. Copy to ~/.llama-mm/profiles.json (or point config.profiles_file at it). The top-level 'default' profile is used whenever a tool call omits profile_id — the example defaults to LM Studio's standard port 1234, so if LM Studio is running with a model loaded, chat/usage_stats work zero-config. provider: 'llama-server' = full lifecycle (start/stop/bench/telemetry, needs model paths); 'openai-compatible' = inference + stats against a running server (LM Studio :1234, Ollama :11434/v1, vLLM, llama-swap). tier drives workflow routing: 'quality' = high-quality executor, 'bulk' = fast/rough executor. llama-server profiles also accept: 'device' (GPU pool name; VRAM budgets are checked per pool via config.vram_budget_by_device and switch_profile only restarts instances in the same pool), 'vram_gb' (override weight_gb for budget accounting, e.g. CPU-offload tiers), 'host' (llama-server on another machine — start/stop/switch refuse, chat/complete/bench go over HTTP).",
   "default": "lmstudio",
   "profiles": {
     "lmstudio": {
@@ -85,6 +85,14 @@
         "--top-p": "0.9",
         "--top-k": "40"
       }
+    },
+    "remote-workstation-27b": {
+      "provider": "llama-server",
+      "tier": "quality",
+      "host": "192.168.1.50",
+      "port": 8191,
+      "model": "Qwen3.8-27B-Q4_K_M.gguf",
+      "description": "llama-server running on another machine: chat/complete/bench go over HTTP; start/stop/switch are refused locally. Start it on the remote box yourself (or via its own llama-mm)."
     }
   }
 }

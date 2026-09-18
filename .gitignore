@@ -4,7 +4,7 @@ __pycache__/
 *.egg-info/
 build/
 dist/
-stats/usage.json
+**/stats/usage.json
 logs/
 .env-amd
 *.log

@@ -60,30 +60,50 @@ def port_listener_pid(port: int) -> int | None:
     return None
 
 
+def instance_device(inst: dict) -> str:
+    """GPU pool of a running instance: the source profile's device field.
+    Externally started instances land in the default pool."""
+    if inst.get("source", "external") == "external":
+        return "default"
+    try:
+        from .profiles import find_profile
+        return find_profile(inst["source"]).device or "default"
+    except Exception:
+        return "default"
+
+
 def vram_snapshot() -> dict:
     """Per-instance VRAM estimate + optional live sources (metrics gauges where
-    the build provides them, rocm-smi when installed). Budget from config."""
+    the build provides them, rocm-smi when installed). Budgets from config,
+    per GPU pool (device); pools without a budget use the global one."""
     cfg = get_config()
     weights: dict[str, float] = {}
     try:
         from . import profiles as profiles_mod
-        for p, _ in [(pp, None) for pp in profiles_mod.load_profiles()[0]]:
-            if p.weight_gb and p.model:
-                weights[os.path.basename(p.model)] = p.weight_gb
+        for p in profiles_mod.load_profiles()[0]:
+            w = p.vram_gb or p.weight_gb
+            if w and p.model:
+                weights[os.path.basename(p.model)] = w
     except Exception:
         pass
 
+    def budget_for(dev: str) -> float:
+        return cfg.vram_budget_by_device.get(dev, cfg.vram_budget_gb)
+
     per: dict[int, dict] = {}
+    pool_used: dict[str, float] = {}
     total_est = 0.0
     for inst in find_servers():
         if inst["port"] is None:
             continue
-        entry: dict = {}
+        dev = instance_device(inst)
+        entry: dict = {"device": dev}
         if inst["model"]:
             w = weights.get(os.path.basename(inst["model"]))
             if w:
                 entry["estimated_gb"] = w
                 total_est += w
+                pool_used[dev] = pool_used.get(dev, 0.0) + w
         try:
             m = llama_client.metrics_vram(inst["port"])
             if "vram_used_gb" in m:
@@ -105,21 +125,29 @@ def vram_snapshot() -> dict:
                             for v in next(iter(data.values())).values()) / 2**30
         except Exception:
             pass
+    pools = sorted(set(pool_used) | set(cfg.vram_budget_by_device)) or ["default"]
+    by_device = {d: {"used_estimated_gb": round(pool_used.get(d, 0.0), 2),
+                     "budget_gb": budget_for(d)} for d in pools}
     return {"used_estimated_gb": round(total_est, 2),
-            "budget_gb": cfg.vram_budget_gb, "per_port": per}
+            "budget_gb": cfg.vram_budget_gb, "per_port": per,
+            "by_device": by_device}
 
 
-def vram_conflicts(new_weight_gb: float | None) -> list[str]:
+def vram_conflicts(new_weight_gb: float | None, device: str = "default") -> list[str]:
+    """Budget check scoped to one GPU pool; other pools are not counted."""
     snap = vram_snapshot()
-    if not snap["per_port"] and not new_weight_gb:
+    dev = device or "default"
+    pool = snap.get("by_device", {}).get(dev, {})
+    used = pool.get("used_estimated_gb", 0.0)
+    budget = pool.get("budget_gb", get_config().vram_budget_by_device.get(
+        dev, get_config().vram_budget_gb))
+    projected = used + (new_weight_gb or 0)
+    if projected <= budget:
         return []
-    projected = snap["used_estimated_gb"] + (new_weight_gb or 0)
-    if projected <= snap["budget_gb"]:
-        return []
-    lines = [f"当前已用(估) {snap['used_estimated_gb']}GB + 新模型约 {new_weight_gb or '?'}GB "
-             f"= {round(projected, 1)}GB > 预算 {snap['budget_gb']}GB"]
+    lines = [f"GPU 池 '{dev}' 已用(估) {round(used, 2)}GB + 新模型约 {new_weight_gb or '?'}GB "
+             f"= {round(projected, 2)}GB > 预算 {budget}GB"]
     lines += [f"  端口 {p}: {e.get('used_gb') or e.get('estimated_gb') or '?'}GB"
-              for p, e in snap["per_port"].items()]
+              for p, e in snap["per_port"].items() if e.get("device") == dev]
     return lines
 
 

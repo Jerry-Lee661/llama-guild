@@ -16,6 +16,7 @@ import time
 from mcp.server.fastmcp import FastMCP
 
 from . import bench as bench_mod
+from . import discovery as discovery_mod
 from . import env_amd_adapter, llama_client, process_mgr, profiles as profiles_mod, stats
 from .config import get_config
 from .profiles import Profile, ProfileError, find_profile, load_profiles, read_default_id
@@ -30,6 +31,7 @@ mcp = FastMCP(
         "tier 字段驱动工作流路由：quality=高质量执行档，bulk=高速批量档。"
         "未指定 profile_id 时回退到 profiles.json 的 default 档位（未设置则要求用户指定）。"
         "provider=openai-compatible（LM Studio/Ollama/vLLM）仅支持推理与统计。"
+        "局域网节点：lan_discover 浏览 _local-ai._tcp 并可注册为远程档位。"
     ),
 )
 
@@ -66,6 +68,13 @@ def _need(profile: Profile | None, feature: str, port: int | None) -> None:
 
 def _build_args(p: Profile, ctx: int | None, extra_args: list[str] | None) -> list[str]:
     args = list(p.raw_args)
+    # JSON 档位的 model/port 存结构化字段、env-amd 档位在 raw_args 里原样携带；
+    # 无论哪种来源，最终命令行必须带 -m 和 --port，否则 llama-server 会静默
+    # 降级成 router 模式并绑默认端口 8080。
+    if p.model and "-m" not in args and "--model" not in args:
+        args += ["-m", p.model]
+    if p.port is not None and "--port" not in args:
+        args += ["--port", str(p.port)]
     if ctx is not None:
         if "-c" in args:
             args[args.index("-c") + 1] = str(ctx)
@@ -108,7 +117,8 @@ def list_profiles(include_removed: bool = False) -> dict:
         out.append({
             "id": p.id, "provider": p.provider, "tier": p.tier or None,
             "default": p.id == default,
-            "port": p.port, "ctx": p.ctx,
+            "port": p.port, "ctx": p.ctx, "device": p.device,
+            "remote_host": p.base_url if p.remote else None,
             "model": os.path.basename(p.model) if p.model else None,
             "draft_model": os.path.basename(p.draft_model) if p.draft_model else None,
             "vision": bool(p.mmproj), "weight_gb": p.weight_gb,
@@ -140,15 +150,17 @@ def server_status() -> dict:
                 pass
         instances.append(entry)
     vram = process_mgr.vram_snapshot()
-    over = vram["used_estimated_gb"] > vram["budget_gb"]
+    over = {d: v for d, v in vram.get("by_device", {}).items()
+            if v["used_estimated_gb"] > v["budget_gb"]}
     ports: dict = {}
     for pp in load_profiles()[0]:
         if pp.port is not None and pp.provider == "llama-server":
             ports[str(pp.port)] = {"profile": pp.id, "tier": pp.tier or None}
     return {"instances": instances, "vram": vram,
-            "vram_note": "used 为估算值（profile weight_gb）；实时 VRAM 需构建支持" if instances else None,
-            "budget_warning": (f"总 VRAM(估) {vram['used_estimated_gb']}GB 超预算 "
-                               f"{vram['budget_gb']}GB" if over else None),
+            "vram_note": "used 为估算值（profile weight_gb/vram_gb）；实时 VRAM 需构建支持" if instances else None,
+            "budget_warning": ("GPU 池超预算: " + "; ".join(
+                f"{d} {v['used_estimated_gb']}/{v['budget_gb']}GB"
+                for d, v in over.items()) if over else None),
             "profile_ports": ports}
 
 
@@ -171,6 +183,10 @@ def start_profile(profile_id: str | None = None, ctx: int | None = None,
     """按档位启动 llama-server（ctx 可覆盖；profile_id 省略时用 profiles 的 default 档）。端口被占或 VRAM 超预算时拒绝（force=true 越过 VRAM 限制）。"""
     p = _profile_or_default(profile_id)
     require(p.provider, "start")
+    if p.remote:
+        raise UnsupportedFeature(
+            f"profile {p.id} 指向远程 host（{p.base_url}），无法在本地启动；"
+            "直接用 chat/complete/bench 调用它即可")
     if p.removed and not force:
         raise ValueError(f"profile {p.id} 标记为已移除（模型文件可能已删），确认请传 force=true")
     if p.model and not os.path.isfile(p.model) and not p.model.startswith("~"):
@@ -181,13 +197,18 @@ def start_profile(profile_id: str | None = None, ctx: int | None = None,
     listener = process_mgr.port_listener_pid(port)
     if listener is not None:
         raise ValueError(f"端口 {port} 已被 PID {listener} 监听，先 stop_profile 或 switch_profile")
-    conflicts = process_mgr.vram_conflicts(p.weight_gb)
+    conflicts = process_mgr.vram_conflicts(p.vram_gb or p.weight_gb, p.device)
     if conflicts and not force:
         raise ValueError("VRAM 预算冲突:\n" + "\n".join(conflicts) + "\n确认启动请传 force=true")
     extra_path = None
     if p.needs_rocm_path:
         extra_path = get_config().rocm_smi_path and os.path.dirname(get_config().rocm_smi_path) or None
-    proc = process_mgr.start_profile(p.exe, _build_args(p, ctx, extra_args), p.id, extra_path)
+    final_args = _build_args(p, ctx, extra_args)
+    if "-m" not in final_args and "--model" not in final_args:
+        raise ValueError(
+            f"profile {p.id} 定义不完整：model 字段为空且 args 里没有 -m/--model，"
+            "拒绝启动（否则会静默起成无模型的 router 模式）")
+    proc = process_mgr.start_profile(p.exe, final_args, p.id, extra_path)
     h = process_mgr.wait_health(port, wait_seconds)
     out = {"profile": p.id, "pid": proc.pid, "port": port, "ctx": ctx or p.ctx,
            "log": process_mgr.log_path_for(p.id), "health": h["status"]}
@@ -202,6 +223,9 @@ def stop_profile(profile_id: str | None = None) -> dict:
     """停止某档位对应的 llama-server 实例（按监听端口定位，树杀；省略时用 default 档）。"""
     p = _profile_or_default(profile_id)
     require(p.provider, "stop")
+    if p.remote:
+        raise UnsupportedFeature(
+            f"profile {p.id} 指向远程 host（{p.base_url}），本机没有它的进程可停")
     if p.port is None:
         raise ValueError(f"profile {p.id} 缺少 port")
     pid = process_mgr.port_listener_pid(p.port)
@@ -222,14 +246,21 @@ def stop_all() -> dict:
 @mcp.tool()
 def switch_profile(profile_id: str | None = None, ctx: int | None = None, force: bool = False,
                    wait_seconds: float = 300.0) -> dict:
-    """切换档位：先停掉全部 llama-server（显存同一时刻只容一个大盘），再启动目标档（省略时用 default 档）。"""
+    """切换档位：停掉目标 GPU 池（profile.device）上的 llama-server 再启动目标档，
+    其他池的实例不受影响（省略 profile_id 时用 default 档）。"""
     p = _profile_or_default(profile_id)
     require(p.provider, "switch")
-    stopped = [i["pid"] for i in process_mgr.find_servers()]
-    process_mgr.stop_all()
+    if p.remote:
+        raise UnsupportedFeature(
+            f"profile {p.id} 指向远程 host（{p.base_url}），无法在本地执行 switch")
+    pool = p.device or "default"
+    victims = [i["pid"] for i in process_mgr.find_servers()
+               if process_mgr.instance_device(i) == pool]
+    for pid in victims:
+        process_mgr.stop_tree(pid)
     time.sleep(1)
     started = start_profile(profile_id, ctx=ctx, force=force, wait_seconds=wait_seconds)
-    return {"stopped_pids": stopped, "started": started}
+    return {"stopped_pids": victims, "device_pool": pool, "started": started}
 
 
 # ---------- 7-10. router mode (llama-server) ----------
@@ -302,7 +333,9 @@ def chat(profile_id: str | None = None, port: int | None = None,
     """调试推理（流式测 TTFT；分离 reasoning；返回 usage/tps）。messages=[{"role","content"}]。model 字段供 router/多模型端点路由。"""
     if not messages:
         raise ValueError("需要 messages 参数")
-    base, _p = _target(profile_id, port)
+    base, p = _target(profile_id, port)
+    if model is None and p is not None and p.host and p.model:
+        model = p.model
     return llama_client.chat(base, messages, model=model, max_tokens=max_tokens,
                              temperature=temperature, top_p=top_p, top_k=top_k,
                              timeout=timeout_seconds)
@@ -355,6 +388,12 @@ def bench(profile_id: str | None = None, port: int | None = None,
 @mcp.tool()
 def read_server_log(profile_id: str, tail: int = 200) -> dict:
     """尾读本 server 启动的实例日志（硬上限 200 行）。"""
+    try:
+        prof = find_profile(profile_id)
+    except ProfileError:
+        prof = None   # router-<port> 等非档位日志仍可读
+    if prof is not None and prof.remote:
+        raise UnsupportedFeature(f"profile {profile_id} 指向远程 host，本机没有它的日志")
     tail = min(int(tail), 200)
     path = process_mgr.log_path_for(profile_id)
     return {"profile": profile_id, "log": path, "tail": _log_tail(path, tail)}
@@ -398,7 +437,25 @@ def usage_stats(profile_id: str | None = None, port: int | None = None,
     return out
 
 
-# ---------- 18. validation ----------
+# ---------- 18. lan discovery ----------
+
+@mcp.tool()
+def lan_discover(service_type: str = "_local-ai._tcp.local.", wait_seconds: float = 4.0,
+                 register: bool = False, overwrite: bool = False) -> dict:
+    """发现局域网中的本地模型服务（mDNS/DNS-SD，默认 _local-ai._tcp，兼容
+    pub-local-ai-discovery-server 的 v/api/auth/base/models TXT 协议）。
+    register=true 时探测端点并写入 profiles.json：/props 有响应的注册为远程
+    llama-server 档（chat/complete/bench/metrics 可用，生命周期归远端），其余注册为
+    openai-compatible 档（仅 chat/usage_stats）；同名档位需 overwrite=true 覆盖。"""
+    services = discovery_mod.discover(service_type, wait_seconds)
+    out: dict = {"service_type": service_type, "count": len(services), "services": services}
+    if register:
+        out["registered"] = (discovery_mod.register_profiles(services, overwrite=overwrite)
+                             if services else [])
+    return out
+
+
+# ---------- 19. validation ----------
 
 @mcp.tool()
 def validate_profiles() -> dict:
@@ -408,8 +465,8 @@ def validate_profiles() -> dict:
     issues += load_issues
     missing = []
     for p in profs:
-        if p.provider != "llama-server":
-            continue
+        if p.provider != "llama-server" or p.remote:
+            continue   # 远程档位的模型/可执行文件在别的机器上，不在本机检查
         for label, path in (("exe", p.exe), ("model", p.model),
                             ("draft", p.draft_model), ("mmproj", p.mmproj)):
             if path and not os.path.isfile(os.path.expanduser(path)):

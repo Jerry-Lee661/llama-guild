@@ -26,6 +26,7 @@ class Config:
     server_exe: str = "llama-server"
     host: str = "127.0.0.1"
     vram_budget_gb: float = 20.0
+    vram_budget_by_device: dict = field(default_factory=dict)  # per GPU pool, e.g. {"gpu0": 24, "gpu1": 12}
     stats_enabled: bool = True
     stats_path: str | None = None          # default: <pkg>/stats/usage.json
     log_dir: str | None = None             # default: <pkg>/logs
@@ -62,6 +63,10 @@ def load_config() -> Config:
                 cfg.env_amd_aliases = data["env_amd_aliases"]
             if isinstance(data.get("vram_budget_gb"), (int, float)):
                 cfg.vram_budget_gb = float(data["vram_budget_gb"])
+            if isinstance(data.get("vram_budget_by_device"), dict):
+                cfg.vram_budget_by_device = {
+                    str(k): float(v) for k, v in data["vram_budget_by_device"].items()
+                    if isinstance(v, (int, float))}
             if isinstance(data.get("stats_enabled"), bool):
                 cfg.stats_enabled = data["stats_enabled"]
             break

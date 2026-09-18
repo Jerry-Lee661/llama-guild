@@ -110,6 +110,7 @@ def chat(base: int | str, messages: list[dict], model: str | None = None,
     content_parts: list[str] = []
     reasoning_parts: list[str] = []
     usage = None
+    model_hint = None
     t0 = time.perf_counter()
     ttft_ms = None
     with httpx.stream("POST", _base(base) + "/v1/chat/completions",
@@ -126,6 +127,8 @@ def chat(base: int | str, messages: list[dict], model: str | None = None,
                 chunk = json.loads(payload)
             except json.JSONDecodeError:
                 continue
+            if model_hint is None and chunk.get("model"):
+                model_hint = chunk["model"]
             if chunk.get("usage"):
                 usage = chunk["usage"]
             for ch in chunk.get("choices", []):
@@ -154,7 +157,8 @@ def chat(base: int | str, messages: list[dict], model: str | None = None,
             "completion_tokens": ct,
             "cached_tokens": (usage.get("prompt_tokens_details") or {}).get("cached_tokens"),
         }
-        record_usage(base, out, usage, resp_model=(usage.get("model") or None), source="chat")
+        record_usage(base, out, usage,
+                     resp_model=(usage.get("model") or model_hint or None), source="chat")
     if out["content"] == "" and out["reasoning"] is None:
         out["note"] = "无输出（可能 reasoning 预算耗尽或被截断）"
     return out
@@ -197,9 +201,14 @@ def record_usage(base: int | str, out: dict, usage: dict, resp_model: str | None
     if not get_config().stats_enabled:
         return
     try:
-        model = resp_model or props(base).get("model_path") or f"endpoint-{base}"
+        model = resp_model
+        if not model:
+            try:
+                model = props(base).get("model_path")
+            except Exception:
+                model = None   # openai-compatible 端点没有 /props，落到 endpoint 名
         tps = out.get("decode_tps") or out.get("tps")
-        stats.record(model, usage.get("prompt_tokens"),
+        stats.record(model or f"endpoint-{base}", usage.get("prompt_tokens"),
                      usage.get("completion_tokens"), out.get("total_ms", 0),
                      tps, source)
     except Exception:
