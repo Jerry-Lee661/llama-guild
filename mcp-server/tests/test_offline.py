@@ -291,6 +291,40 @@ def test_record_usage_falls_back_when_props_unavailable():
         llama_client.props, llama_client.stats.record = saved
 
 
+def test_preflight_capacity_and_gate():
+    from llama_multimodel_mcp import preflight as pf
+
+    # args parsing: --ctx-size / --parallel, defaults
+    assert pf.parse_args_capacity(["--ctx-size", "262144", "--parallel", "2"]) == 131072
+    assert pf.parse_args_capacity(["-c", "65536"]) == 65536
+    assert pf.parse_args_capacity(["--jinja"]) is None
+
+    # router /models payload: loaded model meta.n_ctx, per-model selection
+    models = [
+        {"id": "qwen38-27b", "status": {"value": "unloaded", "args": ["--ctx-size", "65536"]}},
+        {"id": "tiel-q6", "status": {"value": "loaded", "args": ["--ctx-size", "262144", "--parallel", "2"]},
+         "meta": {"n_ctx": 131072}},
+    ]
+    cap = pf.models_capacity(models)                      # loaded wins, exact; no model → None
+    assert cap == {"slot_ctx": 131072, "model": None, "exact": True}
+    cap = pf.models_capacity(models, model="qwen38-27b")  # unloaded target: parsed, not exact
+    assert cap == {"slot_ctx": 65536, "model": "qwen38-27b", "exact": False}
+
+    # gate: over budget → structured rejection; within → None
+    d = pf.decision(134000, 4096, 131072)
+    assert d["error"]["type"] == "context_exceeded" and d["error"]["retryable"] is False
+    assert d["error"]["prompt_tokens"] == 134000 and d["error"]["slot_ctx"] == 131072
+    assert pf.decision(1000, 256, 131072) is None
+
+    # heuristic leg marks capacity as estimated
+    d = pf.gate("x" * 400000, 4096, {"slot_ctx": 131072, "model": "m", "exact": False},
+                count_exact=lambda m: (_ for _ in ()).throw(RuntimeError("must not tokenize")))
+    assert d["error"]["capacity_estimated"] is True
+
+    # fail-open: unknown capacity allows the request
+    assert pf.gate("x" * 10**7, 4096, None, count_exact=lambda m: 1) is None
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

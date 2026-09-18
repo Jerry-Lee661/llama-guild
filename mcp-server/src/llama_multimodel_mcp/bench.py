@@ -47,7 +47,7 @@ def _speed(port: int, runs: int, gen_tokens: int, temperature: float,
     results = []
     for i in range(runs):
         r = llama_client.complete(port, prompt, n_predict=gen_tokens,
-                                  temperature=temperature, timeout=timeout)
+                                  temperature=temperature, timeout=timeout, preflight=False)
         results.append({
             "run": i + 1,
             "decode_tps": r["decode_tps"],
@@ -82,7 +82,7 @@ def _ttft(port: int, runs: int, timeout: float) -> dict:
 
 def _prefill(port: int, target_tokens: int, timeout: float) -> dict:
     r = llama_client.complete(port, _filler_prompt(target_tokens), n_predict=1,
-                              timeout=timeout)
+                              timeout=timeout, preflight=False)
     return {"port": port, "mode": "prefill", "target_tokens": target_tokens,
             "prompt_n": r["prompt_n"], "prefill_tps": r["prefill_tps"]}
 
@@ -92,13 +92,13 @@ def _longctx(port: int, target_tokens: int, gen_tokens: int, temperature: float,
     # One correction pass: measure actual prompt_n, rescale filler length.
     prompt = _filler_prompt(target_tokens)
     r = llama_client.complete(port, prompt, n_predict=gen_tokens,
-                              temperature=temperature, timeout=timeout)
+                              temperature=temperature, timeout=timeout, preflight=False)
     actual = r.get("prompt_n") or 0
     if actual and abs(actual - target_tokens) / target_tokens > 0.15:
         scale = target_tokens / actual
         prompt = _filler_prompt(int(target_tokens * scale))
         r = llama_client.complete(port, prompt, n_predict=gen_tokens,
-                                  temperature=temperature, timeout=timeout)
+                                  temperature=temperature, timeout=timeout, preflight=False)
         actual = r.get("prompt_n")
     return {"port": port, "mode": "longctx", "target_tokens": target_tokens,
             "prompt_n": actual, "decode_tps": r["decode_tps"],

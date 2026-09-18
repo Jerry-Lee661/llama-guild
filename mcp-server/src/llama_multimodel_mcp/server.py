@@ -336,9 +336,14 @@ def chat(profile_id: str | None = None, port: int | None = None,
     base, p = _target(profile_id, port)
     if model is None and p is not None and p.host and p.model:
         model = p.model
+    capacity = None
+    if p is not None and p.provider != "llama-server" and p.ctx:
+        # openai-compatible: no /props //tokenize — heuristic gate on the
+        # profile-declared ctx only (no ctx → preflight fails open)
+        capacity = {"slot_ctx": p.ctx, "model": model or p.model, "exact": False}
     return llama_client.chat(base, messages, model=model, max_tokens=max_tokens,
                              temperature=temperature, top_p=top_p, top_k=top_k,
-                             timeout=timeout_seconds)
+                             timeout=timeout_seconds, preflight_capacity=capacity)
 
 
 @mcp.tool()

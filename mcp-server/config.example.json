@@ -5,6 +5,8 @@
   "vram_budget_gb": 20,
   "vram_budget_by_device": {},
   "stats_enabled": true,
+  "preflight": true,
+  "heuristic_chars_per_token": 3.0,
   "stats_path": null,
   "log_dir": null,
   "profiles_file": null,

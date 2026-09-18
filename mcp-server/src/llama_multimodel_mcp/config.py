@@ -28,6 +28,8 @@ class Config:
     vram_budget_gb: float = 20.0
     vram_budget_by_device: dict = field(default_factory=dict)  # per GPU pool, e.g. {"gpu0": 24, "gpu1": 12}
     stats_enabled: bool = True
+    preflight: bool = True              # context preflight before inference calls
+    heuristic_chars_per_token: float = 3.0
     stats_path: str | None = None          # default: <pkg>/stats/usage.json
     log_dir: str | None = None             # default: <pkg>/logs
     profiles_file: str | None = None       # default: ~/.llama-mm/profiles.json
@@ -69,6 +71,10 @@ def load_config() -> Config:
                     if isinstance(v, (int, float))}
             if isinstance(data.get("stats_enabled"), bool):
                 cfg.stats_enabled = data["stats_enabled"]
+            if isinstance(data.get("preflight"), bool):
+                cfg.preflight = data["preflight"]
+            if isinstance(data.get("heuristic_chars_per_token"), (int, float)):
+                cfg.heuristic_chars_per_token = float(data["heuristic_chars_per_token"])
             break
     cfg.server_exe = _env("LLAMA_MM_SERVER_EXE", cfg.server_exe)
     cfg.host = _env("LLAMA_MM_HOST", cfg.host)

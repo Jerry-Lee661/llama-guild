@@ -14,6 +14,7 @@ from typing import Any
 
 import httpx
 
+from . import preflight as preflight_mod
 from . import stats
 from .config import get_config
 
@@ -90,10 +91,69 @@ def metrics_vram(base: int | str) -> dict:
 
 # ---------- inference (both providers) ----------
 
+_ctx_cache: dict[str, tuple[float, dict | None]] = {}
+_CTX_TTL = 60.0
+
+
+def slot_capacity(base: int | str, model: str | None = None,
+                  use_cache: bool = True) -> dict | None:
+    """Per-slot context capacity for the target endpoint. None = unknown
+    (probe failed → preflight fails open). Cached ~60s per (base, model)."""
+    key = f"{_base(base)}::{model or ''}"
+    now = time.time()
+    hit = _ctx_cache.get(key)
+    if use_cache and hit and now - hit[0] < _CTX_TTL:
+        return hit[1]
+    cap = None
+    try:
+        props = request(base, "GET", "/props", timeout=10)
+        if isinstance(props, dict):
+            n_ctx = (props.get("default_generation_settings") or {}).get("n_ctx")
+            if isinstance(n_ctx, int) and n_ctx > 0:
+                cap = {"slot_ctx": n_ctx, "model": None, "exact": True}
+        if cap is None:
+            # props unusable (router: role="router", n_ctx=0) — fall back to /models
+            cap = preflight_mod.models_capacity(_iter_models(router_models(base)), model)
+    except LlamaHTTPError:
+        cap = None
+    _ctx_cache[key] = (now, cap)
+    return cap
+
+
+def preflight_gate(base: int | str, prompt_text: str, max_tokens: int,
+                   model: str | None = None, capacity: dict | None = None,
+                   enabled: bool | None = None) -> dict | None:
+    """Context preflight. Returns the rejection dict ({"error": {...}}) when
+    over budget, else None (allow). Fails open on probe failure."""
+    if enabled is None:
+        enabled = get_config().preflight
+    if not enabled:
+        return None
+    if capacity is None:
+        capacity = slot_capacity(base, model)
+    if capacity is None:
+        return None
+
+    def count_exact(m: str | None) -> int:
+        body: dict[str, Any] = {"content": prompt_text}
+        if m:
+            body["model"] = m
+        resp = request(base, "POST", "/tokenize", body, timeout=15)
+        return len(resp.get("tokens", []))
+
+    return preflight_mod.gate(prompt_text, max_tokens, capacity, count_exact, model)
+
+
 def chat(base: int | str, messages: list[dict], model: str | None = None,
          max_tokens: int = 256, temperature: float | None = None,
          top_p: float | None = None, top_k: int | None = None,
-         timeout: float = 300.0) -> dict:
+         timeout: float = 300.0, preflight: bool | None = None,
+         preflight_capacity: dict | None = None) -> dict:
+    gate = preflight_gate(base, " ".join(str(m.get("content", "")) for m in messages),
+                          max_tokens, model=model, enabled=preflight,
+                          capacity=preflight_capacity)
+    if gate:
+        return gate
     body: dict[str, Any] = {
         "messages": messages, "max_tokens": max_tokens, "stream": True,
         "stream_options": {"include_usage": True},
@@ -165,9 +225,14 @@ def chat(base: int | str, messages: list[dict], model: str | None = None,
 
 
 def complete(base: int | str, prompt: str, n_predict: int = 256,
-             timeout: float = 600.0, **sampling: Any) -> dict:
+             timeout: float = 600.0, preflight: bool | None = None,
+             **sampling: Any) -> dict:
     """Native llama.cpp /completion with sampling passthrough + timings/draft
     telemetry. llama-server only (gate via providers.require at tool layer)."""
+    gate = preflight_gate(base, prompt, n_predict, model=sampling.get("model"),
+                          enabled=preflight)
+    if gate:
+        return gate
     body: dict[str, Any] = {"prompt": prompt, "n_predict": n_predict,
                             "cache_prompt": True}
     body.update(sampling)
