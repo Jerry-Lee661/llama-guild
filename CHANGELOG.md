@@ -4,6 +4,17 @@
 
 ### Added
 
+- mcp: **context preflight** (ROADMAP #0, A layer) — chat/complete run a
+  two-leg gate before entering the slot queue: chars/token heuristic (blocks
+  absurd requests with zero network; only leg for openai-compatible) then
+  POST /tokenize for exact counts on loaded models. Capacity is derived from
+  launch args (--ctx-size / --parallel) — meta.n_ctx under parallel>1 may
+  report training ctx instead of the per-slot value. Over-budget returns
+  {"error": {type: context_exceeded, retryable: false, prompt_tokens,
+  slot_ctx, hint}} as data. Verified against x99 tiel-q6: 742K-char request
+  rejected in 2.9s with retryable:false; normal request unaffected.
+  config: preflight on/off, heuristic_chars_per_token.
+
 - workflow: **consult-and-record loop** in local-executor — on the 2nd
   consecutive failure with the same error signature, the executor produces a
   structured cloud-side diagnosis ([CONSULT]) and folds it into the final

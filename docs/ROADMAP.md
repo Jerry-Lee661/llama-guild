@@ -5,7 +5,7 @@
 
 ## v0.2 候选（已排期方向）
 
-### 0. 上下文预检——A 层（成本低，事故驱动，排最前）
+### 0. 上下文预检——A 层（成本低，事故驱动，排最前）✅ 已实现并实测验证（004a969；x99 tiel-q6 双路径：超限 2.9s 结构化拒绝 retryable:false / 正常 851ms TTFT，2026-09-19）
 chat/complete 出门先算账：`prompt_tokens + max_tokens > 单槽容量` → 不进 slot 路径，
 直接返回结构化错误（以工具结果 dict 返回，不抛异常，调用方可机读）：
 
@@ -96,7 +96,8 @@ bot 桌面端 provider 直连远程 llama-server，A 层预检够不到。事故
 
 ## 已完成
 
-- 0.2（部分已交付）：#1 行动前自信度闸门（NEEDS_CONTEXT，不消耗失败预算）+
+- 0.2：A 层上下文预检实测通过（004a969，验证脚本 tests/verify_live_preflight.py）。注意：x9 9 preset 2026-09-19 改版为 1x-/2x- 命名（tiel-q6 → 2x-tiel-q6-262k-n2 等），meta.n_ctx 在 parallel>1 时可能报训练 ctx 而非单槽值——预检容量一律从启动参数推导。0.1.1 的两个 known limitation 已修复（switch 非阻塞、start 失败路径受管，2c4b725）。
+- 0.2（规程部分已交付）：#1 行动前自信度闸门（NEEDS_CONTEXT，不消耗失败预算）+
   #2 回传 schema 化（结论/依据/待办，编排者只留摘要）—— dff0c7c；
   触发硬开关 guild-switch + when_to_use 负面清单 —— a48b96e；
   opencode 第 8 端（DeepSeek V4 Pro 编排/审计 + V4 Flash 落实的全云端形态）—— 17a3bd2。
