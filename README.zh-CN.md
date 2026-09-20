@@ -6,26 +6,27 @@
 [![agents](https://img.shields.io/badge/agent%20tools-8-blue.svg)](#支持的-agent-工具)
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-b11xx%20verified-brightgreen.svg)](https://github.com/ggml-org/llama.cpp)
 
-**别再为本地模型能写的代码付云端 token 的钱。**
-llama-guild 把编码 agent 的工作分给两个大脑：云端强模型只写**契约**、做验收；
-写代码这件事交给便宜的**本地大模型**（llama.cpp / LM Studio / Ollama）。
-成本降一个数量级，质量由工具化的验收流程兜住。
+**本地模型能写的代码，不用再花云端 token 的钱。**
+llama-guild 把编码 agent 的工作分成两半：云端强模型出一份任务契约，写清要改什么、
+怎么验证，做完后负责检查；写代码交给便宜的**本地大模型**
+（llama.cpp / LM Studio / Ollama）。成本降到约十分之一，质量由验收流程把关。
 
 English documentation: **[README.md](README.md)**
 
 ## 它做什么
 
-- **按模型强弱分工。** 云端模型负责规划、接线、审计；业务代码每一行都由本地模型写。
-  路由是**硬策略**而非提示词礼仪：契约清单上的任务机械地派给本地执行者，
-  "任务太复杂/系统级"不构成有效的跳过理由。
-- **让本地模型保持可靠。** 本地 27-35B 模型胜任**填空执行**，做不了**自驱工程师**。
-  所以每次派发都是有边界的任务包（≤5 个文件片段、一次一文件、立即验证），
-  前置自信度闸门，后置由强模型对照契约审计，本地模型从不给自己的作业打分。
-- **守住两种真实事故。** **上下文预检**：超预算请求在毫秒级被拒绝并返回结构化错误，
-  不占用推理槽位（源自真实事故：一个 610K token 的请求循环独占 router 槽位数小时）。
-  **显存预算守卫**：共存模型按 GPU 分池管控，批量派发让每档位每会话至多一次加载/卸载。
-- **观测一切，不外传任何数据。** 流式 TTFT / tps / 投机解码验收遥测、四种基准测试、
-  token 用量统计，全部只存本地。没有任何遥测离开你的机器。
+- **按模型强弱分工。** 云端模型负责规划、审计和最终验收；业务代码全部由本地模型写。
+  分工规则写死在流程里：契约清单上的任务一律派给本地模型，
+  不接受"任务太复杂"这类跳过理由。
+- **让本地模型保持可靠。** 本地 27-35B 模型擅长照规格办事，不擅长自己拿主意。
+  所以每次只派一个小任务（最多附 5 段参考代码，一次只改一个文件，改完立即验证）；
+  信息不够就退回询问，写完由云端模型对照契约检查，本地模型不检查自己的产出。
+- **防住两类真实事故。** 一是上下文超长：发送前先检查长度，超限的请求立刻被拒绝，
+  不占推理槽位（起因是一次真实事故：一个 61 万 token 的请求反复重试，独占
+  router 槽位数小时）。二是显存超支：多个模型共存时按显卡分组管控，
+  同一档位的模型每次会话至多加载/卸载一次。
+- **运行数据全部留在本机。** 提供首字延迟、生成速度、投机解码接受率等实时指标、
+  四种基准测试和 token 用量统计，数据只写本地文件，不外传。
 
 ## 工作原理
 
@@ -50,27 +51,28 @@ English documentation: **[README.md](README.md)**
           完整生命周期管理              LM Studio · Ollama · vLLM · llama-swap
 ```
 
-所有内容打包为 **8 个 skill + 1 个 MCP server**，开箱支持 ZCode、Claude Code、
-Codex、VS Code、DSH、pi、omp、opencode。本地不可用时工作流优雅降级：
-执行者报 `LOCAL_MODEL_FAILED` 或回落会话模式，绝不悄悄代写契约代码，
-也绝不让本地模型脱稿发挥而不被审计。
+以上内容打包成 **8 个 skill + 1 个 MCP server**，支持 ZCode、Claude Code、Codex、
+VS Code、DSH、pi、omp、opencode。本地模型连不上时流程自动降级：执行者上报
+`LOCAL_MODEL_FAILED`，或改由当前会话直接处理；不会偷偷替本地模型写代码，
+也不会放过未经检查的产出。
 
 > **为什么叫"行会"？** 中世纪的行会靠三样东西运转：章程（契约）、师傅带学徒（模型
-> 分工）、出师考核（验收阶梯）。这个隐喻就是架构本身。
+> 分工）、出师考核（验收）。项目的结构正是照这个类比设计的。
 
 ## 功能亮点
 
-| 领域 | 你得到什么 |
+| 领域 | 内容 |
 |---|---|
-| 工作流纪律 | `planner` / `orchestrator` / `local-executor` / `setup` 四个按角色命名的 skill；**宽执行模式**把无契约的机械杂务（资料整理/信息提取/改写）也按类型白名单派给本地模型 |
-| 执行者安全 | 构造提示词前的**自信度闸门**，关键信息缺失时报 `NEEDS_CONTEXT` 而非硬写；重复失败后的**咨询-记录回路**把云端诊断折进最后一次重试，把有效修法记进 `.guild/lessons.md`，同一个坑不踩两次 |
-| 成本与防护 | **上下文预检**（llama.cpp 精确分词，其他后端启发式）返回结构化 `context_exceeded`；显存分池；硬开关可把 skill 从 agent 上下文彻底移除 |
-| 可观测性 | `chat`/`complete` 带 TTFT 与投机解码验收遥测；`bench`（speed / ttft / prefill / longctx）；`usage_stats`，仅存本地 |
+| 流程分工 | `planner` / `orchestrator` / `local-executor` / `setup` 四个 skill 各管一个角色；没有契约的简单杂务（整理资料、提取信息、改写文字）也按类型清单派给本地模型 |
+| 执行保障 | 动手前先自评把握，关键信息缺失就上报 `NEEDS_CONTEXT`，不硬写；本地模型反复失败时向云端要一次诊断，带着建议做最后一次尝试；有效的解法记进 `.guild/lessons.md`，同一个坑不踩第二次 |
+| 成本与防护 | 发送前检查上下文长度（llama.cpp 按 token 精确计算，其他后端估算），超限返回 `context_exceeded` 错误；显存按显卡分池管控；不想用这套流程时，一个脚本就能把 skill 整体关掉 |
+| 运行指标 | `chat`/`complete` 返回首字延迟和投机解码接受率；`bench` 支持速度 / 首字延迟 / 预填充 / 长上下文四种测试；`usage_stats` 查看 token 用量，仅存本地 |
 
 ## 快速开始
 
-> 前置：Python 3.10+、任一支持的 agent 工具，以及一个在跑的本地后端，没有也行：
-> `get-llama` 会帮你下载 llama.cpp；示例档位指向 LM Studio 默认端口 1234，零编辑可用。
+> 准备：Python 3.10+ 和任意一个支持的 agent 工具。本地后端有最好，没有也行，
+> `get-llama` 脚本可以帮你下载 llama.cpp。示例配置指向 LM Studio 的默认端口 1234，
+> 装好并加载模型后无需修改就能用。
 
 ```bash
 git clone https://github.com/Jerry-Lee661/llama-guild.git
@@ -82,51 +84,51 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
 # 还没有 llama.cpp？  powershell -File install\get-llama.ps1   （或 install/get-llama.sh）
 ```
 
-然后在新开的 agent 会话里：**`planner`** 出契约 → 确认 → **`orchestrator`**
-统筹落实。skill 按意图自动触发；想彻底关掉时拨硬开关：
+然后新开一个 agent 会话：先用 **`planner`** 生成契约，确认后再用 **`orchestrator`**
+统筹执行。skill 会按意图自动触发；想彻底停用时运行开关脚本
 `install/guild-switch.ps1 off`。
 
-更喜欢引导式部署？直接调用 **`setup`** skill：问答选后端、按显存推荐模型、
-生成配置、注册 MCP、冒烟验证。完整指南见 [docs/INSTALL.md](docs/INSTALL.md)。
+也可以让 **`setup`** skill 引导安装：问答选定后端、按显存推荐模型、生成配置、
+注册 MCP、做一次冒烟测试。完整指南见 [docs/INSTALL.md](docs/INSTALL.md)。
 
 ## 支持的 agent 工具
 
-| 工具 | Skill 安装 | 角色定义 | MCP 注册 | 派发方式 |
+| 工具 | Skill 安装位置 | 角色定义 | MCP 注册 | 派发方式 |
 |---|---|---|---|---|
 | ZCode | `~/.zcode/skills` | llama-router 插件 `local-executor` | `~/.zcode/cli/config.json` | 子智能体，自动 |
 | Claude Code | `~/.claude/skills` | `~/.claude/agents/local-executor.md` | `claude mcp add` | 子智能体，自动 |
-| Codex | `~/.agents/skills` | 编排者内嵌规程 | `~/.codex/config.toml` | 提示词内嵌 |
-| VS Code | 三个 `.agent.md` chat-mode（按仓库） | chat-mode 即角色 | `.vscode/mcp.json` | 手动 / 子智能体 |
-| DSH | agent-presets（planner/executor 人格） | preset 即角色 | cordis.patch.yml | preset + 子智能体 |
-| pi / omp | 共享约定 | 编排者内嵌规程 | `~/.agents/mcp.json` | 提示词内嵌 |
+| Codex | `~/.agents/skills` | 编排 skill 内置执行规程 | `~/.codex/config.toml` | 写在提示词里 |
+| VS Code | 三个 `.agent.md` chat-mode（按仓库） | 每个 chat-mode 对应一个角色 | `.vscode/mcp.json` | 手动 / 子智能体 |
+| DSH | agent-presets（planner/executor 人格） | 每个 preset 对应一个角色 | cordis.patch.yml | preset + 子智能体 |
+| pi / omp | 共享约定 | 编排 skill 内置执行规程 | `~/.agents/mcp.json` | 写在提示词里 |
 | opencode | — | 主 `orchestrator` + 子 `executor` | `opencode.json` | DeepSeek V4 Pro/Flash 分工 |
 
 ## Provider 与平台
 
-- **llama.cpp `llama-server`**：全生命周期（启停/切换、router 热切换）、原生
-  `/completion` 采样控制、MTP/投机解码遥测、基准测试、精确分词预检。
-- **OpenAI 兼容**：LM Studio、Ollama(`/v1`)、vLLM、llama-swap，当前支持推理与统计，
-  预检走启发式；原生生命周期适配器规划中。
-- **平台**：Windows 实测；macOS/Linux 为 experimental（进程管理用 psutil 跨平台）。
+- **llama.cpp `llama-server`**：全部功能可用：启动/停止/切换模型、router 热切换、
+  原生 `/completion` 采样控制、投机解码统计、基准测试、发送前按 token 精确计算长度。
+- **OpenAI 兼容**：LM Studio、Ollama(`/v1`)、vLLM、llama-swap。当前支持推理和统计，
+  上下文长度只能估算；原生的启停管理在计划中。
+- **平台**：Windows 经过完整测试；macOS/Linux 为实验性支持（进程管理基于 psutil）。
 
 ## 定位
 
 llama-guild 只做一件事：把契约、派发、验收这套多模型分工装进 agent 工具，
-让本地模型承担实现工作。与现有工具是互补关系：
+让本地模型承担实现工作。它和现有工具互补：
 
-- [spec-kit](https://github.com/github/spec-kit)：规格驱动流程，可与本项目的契约层配合使用
-- [llama-swap](https://github.com/mostlygeek/llama-swap)：模型热切换代理，可独立于本项目的 MCP server 使用
+- [spec-kit](https://github.com/github/spec-kit)：规格驱动流程，可以和本项目的契约层配合使用
+- [llama-swap](https://github.com/mostlygeek/llama-swap)：模型热切换代理，可以脱离本项目的 MCP server 单独使用
 - BYOK provider 插件：负责模型接入，llama-guild 在接入之上做分工
 
 ## 隐私与安全
 
-无任何遥测；token 统计只写本地文件；示例配置全部占位符，不含开发者机器路径或凭据。
+不收集任何数据；token 统计只写本地文件；示例配置全部用占位符，不含真实路径或凭据。
 
 **信任模型（暴露给不可信环境前必读）**：本 MCP server 是**本地高权限调试工具**，
-可以启停进程、以 `extra_args` 启动配置中的任意二进制、向配置端点直发任意 HTTP
-请求（`raw_request`），且**没有任何鉴权**。只绑定 localhost、只给受信任的本地
-客户端使用，切勿暴露到网络。`get-llama` 会下载并运行 llama.cpp 官方 release 的
-预编译二进制；固定版本并传入期望 SHA-256 可获得可验证安装。
+可以启停进程、用 `extra_args` 启动配置里的任意程序、向配置的端点发送任意 HTTP
+请求（`raw_request`），而且**没有任何鉴权**。只绑定 localhost、只给受信任的本地
+客户端用，不要暴露到网络。`get-llama` 会下载并运行 llama.cpp 官方 release 的
+预编译程序；固定版本并传入期望的 SHA-256，就能得到可校验的安装。
 
 ## 文档与贡献
 
@@ -136,5 +138,5 @@ llama-guild 只做一件事：把契约、派发、验收这套多模型分工�
   [DSH 接入](dsh/README.md) · [opencode](opencode/README.md) · [MCP server](mcp-server/README.md)
 - [方法论（中文完整版）](docs/WORKFLOW.zh.md) / [Methodology (EN core)](docs/WORKFLOW.en.md)
 
-欢迎贡献，见 [CONTRIBUTING.md](CONTRIBUTING.md)；安全问题见
+欢迎参与贡献，见 [CONTRIBUTING.md](CONTRIBUTING.md)；安全问题见
 [SECURITY.md](SECURITY.md)；MIT 许可（[LICENSE](LICENSE)）。
