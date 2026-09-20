@@ -1,6 +1,7 @@
 # Changelog
 
 All notable changes are documented here. Dates are 2026, UTC+8.
+[中文版更新日志](CHANGELOG.zh.md) (reference translation; English is canonical).
 
 ## v0.2.0 — 2026-09-19
 

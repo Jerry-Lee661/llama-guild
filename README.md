@@ -38,12 +38,19 @@ workforce:
   executor — "too complex / system-level" is not an acceptable excuse).
 - **local-executor subagent** — forces code tokens through the local model via
   MCP; the subagent only assembles prompts, applies output, runs verification.
-  If the local model fails, it reports `LOCAL_MODEL_FAILED` — it never writes
-  the business code itself.
+  It self-checks confidence before acting (`NEEDS_CONTEXT` instead of guessing),
+  consults on repeated failures (a cloud-side `[CONSULT]` diagnosis folded into
+  the final retry, recorded in workspace `.guild/lessons.md`) — and if the
+  local model still fails it reports `LOCAL_MODEL_FAILED`; it never writes the
+  business code itself.
 - **llama-multimodel-mcp** — an MCP server exposing model profiles
   (`profiles.json`), lifecycle (start/stop/switch, router-mode hot swap),
   inference debugging (streaming TTFT, tps, speculative-decoding acceptance
-  telemetry), benchmarks, and **local-only token usage stats**.
+  telemetry), benchmarks, **local-only token usage stats**, and **context
+  preflight**: over-budget requests are rejected in milliseconds with a
+  structured `context_exceeded` error (`retryable:false`) before entering the
+  slot queue — born from a real incident where a 610K-token compact loop
+  monopolized a router slot for hours.
 
 ### How it works
 
@@ -107,7 +114,7 @@ contract → `orchestrator`. Full guide: [docs/INSTALL.md](docs/INSTALL.md).
 - `llama-server` (llama.cpp): full lifecycle, native `/completion`, router mode,
   MTP/spec-decode telemetry, benchmarks.
 - `openai-compatible`: LM Studio, Ollama (`/v1`), vLLM, llama-swap — inference
-  and token stats today; native lifecycle adapters planned (v0.2).
+  and token stats today; native lifecycle adapters planned.
 - macOS/Linux: experimental (process management is cross-platform psutil, but
   only Windows is battle-tested).
 
@@ -129,7 +136,8 @@ verifiable install.
 ### Docs
 
 - [Methodology (EN core)](docs/WORKFLOW.en.md) / [方法论（中文完整版）](docs/WORKFLOW.zh.md)
-- [Install (8 targets)](docs/INSTALL.md) · [Reference baselines 基线](docs/BENCHMARKS.zh.md) · [DSH](dsh/README.md) · [MCP server](mcp-server/README.md)
+- [Install (8 targets)](docs/INSTALL.md) · [Roadmap](docs/ROADMAP.md) · [Reference baselines 基线](docs/BENCHMARKS.zh.md)
+- [Changelog](CHANGELOG.md) / [更新日志（中文）](CHANGELOG.zh.md) · [DSH](dsh/README.md) · [MCP server](mcp-server/README.md)
 
 MIT licensed. Windows-tested on llama.cpp b11xx; issues and profile contributions welcome.
 
@@ -147,10 +155,15 @@ Codex / VS Code / DSH / opencode，另有 pi 与 omp 走共享约定）真正把
   本地不可用时按会话 fallback 亲自落实）、`orchestrator`（派发纪律 +
   **硬路由策略**：契约清单上的任务一律派给本地执行者，"任务复杂/系统级"不是有效跳过理由）。
 - **local-executor 子智能体**——代码 token 强制经 MCP 走本地模型；子智能体只组装提示词、
-  应用输出、跑验证。本地模型失败时报 `LOCAL_MODEL_FAILED`，绝不自己补写业务代码。
+  应用输出、跑验证。行动前先过自信度闸门（低把握回传 `NEEDS_CONTEXT` 而非硬写）；
+  连续失败时进入请教模式（云端侧 `[CONSULT]` 诊断折叠进重试，并记录到工作区
+  `.guild/lessons.md` 避免重复踩坑）；仍失败才报 `LOCAL_MODEL_FAILED`，
+  绝不自己补写业务代码。
 - **llama-multimodel-mcp**——MCP server，暴露模型档位（`profiles.json`）、生命周期
-  （启停/切换、router 热切换）、推理调试（流式 TTFT、tps、投机解码验收遥测）、基准测试，
-  以及**仅存本地的 token 用量统计**。
+  （启停/切换、router 热切换）、推理调试（流式 TTFT、tps、投机解码验收遥测）、基准测试、
+  **仅存本地的 token 用量统计**，以及**上下文预检**——超限请求毫秒级返回结构化
+  `context_exceeded` 拒绝（`retryable:false`），根本不进 slot 队列。源自真实事故：
+  61 万 token 的 compact 循环曾把 router 的唯一 slot 占死数小时。
 
 工作原理见上方架构图。快速开始：
 
@@ -199,6 +212,7 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
 ### 文档
 
 [方法论（中文完整版）](docs/WORKFLOW.zh.md) · [安装（八端）](docs/INSTALL.md) ·
-[参考基线](docs/BENCHMARKS.zh.md) · [DSH 接入](dsh/README.md) · [MCP server](mcp-server/README.md)
+[路线图](docs/ROADMAP.md) · [参考基线](docs/BENCHMARKS.zh.md) ·
+[更新日志（中文）](CHANGELOG.zh.md) · [DSH 接入](dsh/README.md) · [MCP server](mcp-server/README.md)
 
 MIT 许可。Windows + llama.cpp b11xx 实测；欢迎 issue 与档位贡献。
