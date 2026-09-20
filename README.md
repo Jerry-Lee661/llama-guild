@@ -39,24 +39,24 @@ magnitude cheaper, with tool-enforced acceptance so quality doesn't slip.
 ## How it works
 
 ```
-                    ┌────────────────────────────┐
-                    │  orchestrator (cloud model) │  plan · dispatch · audit · accept
-                    └─────────────┬──────────────┘
-              contract task       │ dispatch (profile_id + minimal
-              packages, hard      │ task package), never writes
-              routing policy      ▼ contract code itself
-                    ┌────────────────────────────┐
-                    │ local-executor subagent     │  confidence gate ·
-                    │                             │  assemble prompt · apply · verify
-                    └─────────────┬──────────────┘
-                                  ▼
-                    ┌────────────────────────────┐
-                    │ llama-multimodel-mcp        │  profiles · lifecycle ·
-                    │                             │  preflight · chat/complete · stats
-                    └─────────────┬──────────────┘
-                     ┌────────────┴─────────────┐
+                    ┌──────────────────────────────┐
+                    │  orchestrator (cloud model)  │  the strong model:
+                    └──────────────┬───────────────┘  plan · dispatch · audit · accept
+              contract task        │ dispatch (profile_id + minimal
+              packages, hard       │ task package); the orchestrator
+                                   ▼ never writes contract code itself
+                    ┌──────────────────────────────┐
+                    │    local-executor subagent   │  confidence gate ·
+                    │                              │  assemble prompt · apply · verify
+                    └──────────────┬───────────────┘
+                                   ▼
+                    ┌──────────────────────────────┐
+                    │     llama-multimodel-mcp     │  profiles · lifecycle ·
+                    │                              │  preflight · chat/complete · stats
+                    └──────────────┬───────────────┘
+                     ┌─────────────┴────────────┐
                      ▼                          ▼
-          llama-server (full)        any OpenAI-compatible
+          llama-server (full)        any OpenAI-compatible endpoint
           lifecycle/router/MTP       LM Studio · Ollama · vLLM · llama-swap
 ```
 
