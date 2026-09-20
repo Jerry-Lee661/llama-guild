@@ -40,24 +40,24 @@ magnitude cheaper, with tool-enforced acceptance so quality doesn't slip.
 
 ```
                     ┌──────────────────────────────┐
-                    │  orchestrator (cloud model)  │  the strong model:
+                    │  orchestrator (cloud model)  │  the strong model
                     └──────────────┬───────────────┘  plan · dispatch · audit · accept
-              contract task        │ dispatch (profile_id + minimal
-              packages, hard       │ task package); the orchestrator
-                                   ▼ never writes contract code itself
+              contract task        │ dispatches task packages,
+              packages             │ writes no contract code itself
+                                   ▼
                     ┌──────────────────────────────┐
-                    │    local-executor subagent   │  confidence gate ·
-                    │                              │  assemble prompt · apply · verify
+                    │    local-executor subagent   │  the local model
+                    │                              │  writes the code and verifies it
                     └──────────────┬───────────────┘
                                    ▼
                     ┌──────────────────────────────┐
-                    │     llama-multimodel-mcp     │  profiles · lifecycle ·
-                    │                              │  preflight · chat/complete · stats
-                    └──────────────┬───────────────┘
+                    │     llama-multimodel-mcp     │  model profiles, lifecycle,
+                    │                              │  inference, context checks,
+                    └──────────────┬───────────────┘  usage stats
                      ┌─────────────┴────────────┐
                      ▼                          ▼
-          llama-server (full)        any OpenAI-compatible endpoint
-          lifecycle/router/MTP       LM Studio · Ollama · vLLM · llama-swap
+          llama.cpp llama-server       any OpenAI-compatible endpoint
+          full lifecycle               LM Studio · Ollama · vLLM · llama-swap
 ```
 
 Everything ships as **8 skills + 1 MCP server**, packaged for ZCode, Claude
@@ -128,12 +128,13 @@ smoke test. Full guide: [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Positioning
 
-| Project | Covers | Gap llama-guild fills |
-|---|---|---|
-| [spec-kit](https://github.com/github/spec-kit) | spec-driven process | local-model routing (their #1504/#1784 do it by hand) |
-| [llama-swap](https://github.com/mostlygeek/llama-swap) | model hot-swap proxy | no workflow layer (contracts/routing/acceptance) |
-| BYOK provider plugins | model access | no division of labor |
-| **llama-guild** | **contract task packages + forced local routing + context budgets + acceptance ladder + profiled lifecycle, packaged for 8 agent tools** | single-model inference access is left to BYOK plugins (complementary) |
+llama-guild does one thing: it adds the contract-dispatch-accept division of
+labor to your agent tool, so a local model can carry the implementation work.
+It composes with existing tools:
+
+- [spec-kit](https://github.com/github/spec-kit): spec-driven process; pairs well with this contract layer
+- [llama-swap](https://github.com/mostlygeek/llama-swap): model hot-swap proxy, usable independently of the MCP server
+- BYOK provider plugins: model access; llama-guild adds the division of labor on top
 
 ## Privacy & security
 

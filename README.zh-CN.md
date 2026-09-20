@@ -33,22 +33,21 @@ English documentation: **[README.md](README.md)**
                     ┌──────────────────────────────┐
                     │  orchestrator (cloud model)  │  云端强模型
                     └──────────────┬───────────────┘  规划 · 派发 · 审计 · 验收
-              契约任务包            │ 派发（profile_id + 最小任务包）
-              硬路由策略            │ 编排者绝不亲自写契约代码
+              契约任务包            │ 派发任务包，不亲自写代码
                                    ▼
                     ┌──────────────────────────────┐
                     │    local-executor subagent   │  本地模型子智能体
-                    │                              │  自信度闸门 · 组装提示词
-                    └──────────────┬───────────────┘  应用输出 · 立即验证
+                    │                              │  按任务包写代码并验证结果
+                    └──────────────┬───────────────┘
                                    ▼
                     ┌──────────────────────────────┐
-                    │     llama-multimodel-mcp     │  档位 · 生命周期
-                    │                              │  预检 · chat/complete · 统计
+                    │     llama-multimodel-mcp     │  模型档位与生命周期
+                    │                              │  推理 · 上下文检查 · 用量统计
                     └──────────────┬───────────────┘
                      ┌─────────────┴────────────┐
                      ▼                          ▼
-          llama-server（全功能）         任意 OpenAI 兼容端点
-          生命周期/router/MTP            LM Studio · Ollama · vLLM · llama-swap
+          llama.cpp llama-server       任意 OpenAI 兼容端点
+          完整生命周期管理              LM Studio · Ollama · vLLM · llama-swap
 ```
 
 所有内容打包为 **8 个 skill + 1 个 MCP server**，开箱支持 ZCode、Claude Code、
@@ -112,12 +111,12 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
 
 ## 定位
 
-| 项目 | 覆盖 | llama-guild 补什么 |
-|---|---|---|
-| [spec-kit](https://github.com/github/spec-kit) | 规格驱动流程 | 让本地模型执行规格（其 #1504/#1784 还在手工做） |
-| [llama-swap](https://github.com/mostlygeek/llama-swap) | 模型热切换代理 | 无工作流层（契约/路由/验收） |
-| BYOK provider 插件 | 模型接入 | 无分工能力 |
-| **llama-guild** | **契约任务包 + 强制本地路由 + 上下文预算 + 验收阶梯 + 档位化生命周期，打包到 8 个 agent 工具** | 单模型推理接入交给 BYOK 插件（互补） |
+llama-guild 只做一件事：把契约、派发、验收这套多模型分工装进 agent 工具，
+让本地模型承担实现工作。与现有工具是互补关系：
+
+- [spec-kit](https://github.com/github/spec-kit)：规格驱动流程，可与本项目的契约层配合使用
+- [llama-swap](https://github.com/mostlygeek/llama-swap)：模型热切换代理，可独立于本项目的 MCP server 使用
+- BYOK provider 插件：负责模型接入，llama-guild 在接入之上做分工
 
 ## 隐私与安全
 
