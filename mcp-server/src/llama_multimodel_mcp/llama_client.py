@@ -141,7 +141,7 @@ def preflight_gate(base: int | str, prompt_text: str, max_tokens: int,
         resp = request(base, "POST", "/tokenize", body, timeout=15)
         return len(resp.get("tokens", []))
 
-    return preflight_mod.gate(prompt_text, max_tokens, capacity, count_exact, model)
+    return preflight_mod.gate(prompt_text, max_tokens, capacity, count_exact)
 
 
 def chat(base: int | str, messages: list[dict], model: str | None = None,

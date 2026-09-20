@@ -3,6 +3,21 @@
 All notable changes are documented here. Dates are 2026, UTC+8.
 [中文版更新日志](CHANGELOG.zh.md) (reference translation; English is canonical).
 
+## Unreleased
+
+### Fixed
+
+- mcp-server (context preflight): on router instances with `--parallel > 1`,
+  `GET /models`' `meta.n_ctx` can report the GGUF *training* context (e.g.
+  262144 for tiel-q6) instead of the real per-slot value (131072).
+  `models_capacity()` now derives slot capacity from launch args first
+  (`--ctx-size // --parallel`) and demotes `meta.n_ctx` to a fallback;
+  `gate()` takes the model from the capacity dict (signature change) and the
+  capacity dict carries `{slot_ctx, model, loaded}` instead of an `exact`
+  flag. Unloaded models stay heuristic-only with 10% headroom and never hit
+  `/tokenize` (which would trigger autoload on the x99 router). Regression:
+  `2x-tiel-q6-262k-n2` — args-derived 131072 wins over meta's 262144.
+
 ## v0.2.0 — 2026-09-19
 
 Workflow features, the opencode target, and the incident-driven context

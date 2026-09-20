@@ -305,10 +305,18 @@ def test_preflight_capacity_and_gate():
         {"id": "tiel-q6", "status": {"value": "loaded", "args": ["--ctx-size", "262144", "--parallel", "2"]},
          "meta": {"n_ctx": 131072}},
     ]
-    cap = pf.models_capacity(models)                      # loaded wins, exact; no model → None
-    assert cap == {"slot_ctx": 131072, "model": None, "exact": True}
-    cap = pf.models_capacity(models, model="qwen38-27b")  # unloaded target: parsed, not exact
-    assert cap == {"slot_ctx": 65536, "model": "qwen38-27b", "exact": False}
+    cap = pf.models_capacity(models)                      # loaded wins; no model → None
+    assert cap == {"slot_ctx": 131072, "model": None, "loaded": True}
+    cap = pf.models_capacity(models, model="qwen38-27b")  # unloaded target: parsed from args
+    assert cap == {"slot_ctx": 65536, "model": "qwen38-27b", "loaded": False}
+
+    # parallel>1 with meta.n_ctx reporting training ctx: args-derived wins
+    # (observed on x99 2026-09-19: meta 262144, real slot 262144/2=131072)
+    models2 = [{"id": "2x-tiel-q6-262k-n2", "status": {"value": "sleeping",
+               "args": ["--ctx-size", "262144", "--parallel", "2"]},
+               "meta": {"n_ctx": 262144, "n_ctx_train": 262144}}]
+    cap2 = pf.models_capacity(models2, model="2x-tiel-q6-262k-n2")
+    assert cap2 == {"slot_ctx": 131072, "model": "2x-tiel-q6-262k-n2", "loaded": False}
 
     # gate: over budget → structured rejection; within → None
     d = pf.decision(134000, 4096, 131072)
@@ -316,10 +324,25 @@ def test_preflight_capacity_and_gate():
     assert d["error"]["prompt_tokens"] == 134000 and d["error"]["slot_ctx"] == 131072
     assert pf.decision(1000, 256, 131072) is None
 
-    # heuristic leg marks capacity as estimated
-    d = pf.gate("x" * 400000, 4096, {"slot_ctx": 131072, "model": "m", "exact": False},
+    # heuristic leg: absurd request rejected without tokenizing
+    cap = {"slot_ctx": 131072, "model": "m", "loaded": False}
+    d = pf.gate("x" * 400000, 4096, cap,
                 count_exact=lambda m: (_ for _ in ()).throw(RuntimeError("must not tokenize")))
-    assert d["error"]["capacity_estimated"] is True
+    assert d["error"]["type"] == "context_exceeded"
+
+    # moderate request on non-loaded model: 90%-headroom heuristic, allow
+    assert pf.gate("x" * 3000, 4096, cap,
+                   count_exact=lambda m: (_ for _ in ()).throw(RuntimeError("no tokenize"))) is None
+    # near-limit on non-loaded model: rejected with headroom
+    d = pf.gate("x" * (131072 * 3), 4096, cap,
+                count_exact=lambda m: (_ for _ in ()).throw(RuntimeError("no tokenize")))
+    assert d["error"]["type"] == "context_exceeded"
+
+    # loaded model: exact tokenize leg runs; over → exact-number rejection
+    cap_loaded = {"slot_ctx": 131072, "model": "m", "loaded": True}
+    d = pf.gate("x" * 400000, 4096, cap_loaded, count_exact=lambda m: 134000)
+    assert d["error"]["prompt_tokens"] == 134000 and d["error"]["type"] == "context_exceeded"
+    assert pf.gate("x" * 3000, 256, cap_loaded, count_exact=lambda m: 12) is None
 
     # fail-open: unknown capacity allows the request
     assert pf.gate("x" * 10**7, 4096, None, count_exact=lambda m: 1) is None

@@ -9,3 +9,6 @@ logs/
 .env-amd
 *.log
 .DS_Store
+
+# ad-hoc stdio verification scratch scripts (committed equivalents live in tests/)
+.verify_*.py

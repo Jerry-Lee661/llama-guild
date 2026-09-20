@@ -57,11 +57,14 @@ def parse_args_capacity(args: list[str]) -> int | None:
 def models_capacity(models: list[dict], model: str | None = None) -> dict | None:
     """Capacity from a GET /models payload (router form).
 
-    Returns {"slot_ctx": int, "model": id|None, "exact": bool} where exact
-    means the value came from meta.n_ctx of a loaded model (or the targeted
-    loaded model). `model` (a fragment is enough) selects a specific entry;
-    unloaded selections are parsed from args (exact=False). No match / no
-    usable numbers → None.
+    Returns {"slot_ctx": int, "model": id|None, "loaded": bool}. Slot capacity
+    is ALWAYS derived from launch args (--ctx-size // --parallel) — observed on
+    x99 (2026-09-19): meta.n_ctx under parallel>1 may report the GGUF training
+    ctx (262144) instead of the per-slot value (131072), so meta is only a
+    fallback when args are missing. `model` (fragment match) selects an entry;
+    `loaded` reports whether it is currently loaded (drives the /tokenize leg:
+    tokenizing an unloaded model may trigger autoload). No usable numbers →
+    None.
     """
     def norm(s):
         return str(s or "")
@@ -73,34 +76,35 @@ def models_capacity(models: list[dict], model: str | None = None) -> dict | None
         st = m.get("status") or {}
         return str(st.get("value", st)).lower() if isinstance(st, dict) else str(st).lower()
 
+    def cap_of(m) -> int | None:
+        st = m.get("status") or {}
+        cap = parse_args_capacity(st.get("args") or [])
+        if cap:
+            return cap
+        meta = m.get("meta") or {}
+        cap = meta.get("n_ctx") if isinstance(meta, dict) else None
+        return cap if isinstance(cap, int) and cap > 0 else None
+
     target = None
     loaded_caps: list[int] = []
     for m in models:
         mid = entry_id(m)
-        meta = m.get("meta") or {}
-        st = m.get("status") or {}
-        args = st.get("args") if isinstance(st, dict) else None
         selected = bool(model) and (model in mid or mid in model)
-        if entry_state(m) == "loaded":
-            cap = meta.get("n_ctx") if isinstance(meta, dict) else None
-            if isinstance(cap, int) and cap > 0:
-                if selected:
-                    return {"slot_ctx": cap, "model": mid, "exact": True}
-                loaded_caps.append(cap)
-        if selected and target is None:
-            cap = parse_args_capacity(args or [])
-            if cap:
-                target = {"slot_ctx": cap, "model": mid, "exact": False}
+        is_loaded = entry_state(m) == "loaded"
+        cap = cap_of(m)
+        if selected and cap:
+            target = {"slot_ctx": cap, "model": mid, "loaded": is_loaded}
+        if is_loaded and cap:
+            loaded_caps.append(cap)
     if target:
         return target
     if loaded_caps:
         # several loaded and no explicit model: the request lands on one of
         # them — be conservative with the smallest.
-        return {"slot_ctx": min(loaded_caps), "model": None, "exact": True}
-    caps = [c for c in (parse_args_capacity((m.get("status") or {}).get("args") or [])
-                        for m in models) if c]
+        return {"slot_ctx": min(loaded_caps), "model": None, "loaded": True}
+    caps = [c for c in (cap_of(m) for m in models) if c]
     if caps:
-        return {"slot_ctx": min(caps), "model": None, "exact": False}
+        return {"slot_ctx": min(caps), "model": None, "loaded": False}
     return None
 
 
@@ -121,26 +125,33 @@ def decision(prompt_tokens: int, max_tokens: int, slot_ctx: int,
 
 
 def gate(prompt_text: str, max_tokens: int, capacity: dict | None,
-         count_exact, model: str | None = None) -> dict | None:
+         count_exact) -> dict | None:
     """Full gate for one request. `capacity` is models_capacity()/props output
-    or None (probe failed → allow, fail open). `count_exact(content, model)`
-    counts tokens via /tokenize; any exception downgrades to the heuristic."""
+    or None (probe failed → allow, fail open). `count_exact(model)` counts
+    tokens via /tokenize and is only attempted when capacity["loaded"] is true
+    (tokenizing an unloaded router model may trigger autoload); any exception
+    downgrades to the heuristic."""
     if capacity is None:
         return None
-    cfg = get_config()
     slot = capacity["slot_ctx"]
+    model = capacity.get("model")
     approx = heuristic_tokens(prompt_text)
-    if approx + max_tokens > slot:  # absurd on its face — no network leg needed
-        return decision(approx, max_tokens, slot, exact=False, model=capacity.get("model"))
-    if not capacity.get("exact"):
-        # unloaded router model: exact counting may trigger autoload — stand on the heuristic
-        if approx + max_tokens > slot * 0.9:  # 10% headroom for estimate error
-            return decision(approx, max_tokens, slot, exact=False, model=capacity.get("model"))
+
+    if not capacity.get("loaded"):
+        # unloaded/sleeping router model: exact counting may trigger autoload —
+        # stand on the heuristic with 10% headroom for estimate error
+        if approx + max_tokens > slot:
+            return decision(approx, max_tokens, slot, model=model)
+        if approx + max_tokens > slot * 0.9:
+            return decision(approx, max_tokens, slot, model=model)
         return None
+
+    # loaded: /tokenize is safe and exact — prefer it, heuristic only as the
+    # fallback when the endpoint misbehaves
     try:
-        exact_n = count_exact(model or capacity.get("model"))
+        exact_n = count_exact(model)
     except Exception:
         if approx + max_tokens > slot:
-            return decision(approx, max_tokens, slot, exact=False, model=capacity.get("model"))
+            return decision(approx, max_tokens, slot, model=model)
         return None
-    return decision(exact_n, max_tokens, slot, exact=True, model=capacity.get("model"))
+    return decision(exact_n, max_tokens, slot, model=model)
