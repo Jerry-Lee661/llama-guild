@@ -16,6 +16,7 @@ import time
 from mcp.server.fastmcp import FastMCP
 
 from . import bench as bench_mod
+from . import decide as decide_mod
 from . import discovery as discovery_mod
 from . import env_amd_adapter, llama_client, process_mgr, profiles as profiles_mod, stats
 from .config import get_config
@@ -369,8 +370,9 @@ def chat(profile_id: str | None = None, port: int | None = None,
          messages: list[dict] | None = None, max_tokens: int = 256,
          temperature: float | None = None, top_p: float | None = None,
          top_k: int | None = None, model: str | None = None,
+         logprobs: bool = False, top_logprobs: int | None = None,
          timeout_seconds: float = 300.0) -> dict:
-    """调试推理（流式测 TTFT；分离 reasoning；返回 usage/tps）。messages=[{"role","content"}]。model 字段供 router/多模型端点路由。"""
+    """调试推理（流式测 TTFT；分离 reasoning；返回 usage/tps）。messages=[{"role","content"}]。model 字段供 router/多模型端点路由。logprobs=true 时返回每 token 的 logprob 与 top_logprobs 分布。"""
     if not messages:
         raise ValueError("需要 messages 参数")
     base, p = _target(profile_id, port)
@@ -402,6 +404,7 @@ def chat(profile_id: str | None = None, port: int | None = None,
         capacity = {"slot_ctx": p.ctx, "model": model or p.model, "loaded": False}
     return llama_client.chat(base, messages, model=model, max_tokens=max_tokens,
                              temperature=temperature, top_p=top_p, top_k=top_k,
+                             logprobs=logprobs or None, top_logprobs=top_logprobs,
                              timeout=timeout_seconds, preflight_capacity=capacity)
 
 
@@ -461,6 +464,27 @@ def read_server_log(profile_id: str, tail: int = 200) -> dict:
     tail = min(int(tail), 200)
     path = process_mgr.log_path_for(profile_id)
     return {"profile": profile_id, "log": path, "tail": _log_tail(path, tail)}
+
+
+@mcp.tool()
+def decide(profile_id: str | None = None, port: int | None = None,
+           question: str = "", options: list[str] | None = None,
+           primitive: str = "choice", system: str | None = None,
+           n_probs: int | None = None, timeout_seconds: float = 120.0) -> dict:
+    """Jev 式原子判定：把"K 选一/是-否"问题用约束解码（GBNF 单 token 字母）问本地模型，返回选项概率分布与置信度。两遍选项顺序交换取平均消除位置偏置；置信度用 Jev 公式 c=(pmax−1/K)/(1−1/K)。primitive: choice(K≤26) / noul(yes-no) / score(有序)。概率未经校准——只作排序参考。"""
+    if not question or not options:
+        raise ValueError("需要 question 与 options")
+    base, p = _target(profile_id, port)
+    _need(p, "complete_native", None if isinstance(base, int) else port)
+    model = None
+    if p is not None:
+        if p.host and not p.model:
+            raise ValueError(f"profile {p.id} 是 router 档且未指定 model；decide 需要明确 "
+                             "model（在 profile 增加 model 字段，或改用具体模型档位）")
+        model = p.model or None
+    return decide_mod.run_decide(base, question, list(options), primitive=primitive,
+                                 system=system, n_probs=n_probs, timeout=timeout_seconds,
+                                 model=model)
 
 
 @mcp.tool()

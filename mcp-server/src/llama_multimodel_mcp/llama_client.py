@@ -144,11 +144,44 @@ def preflight_gate(base: int | str, prompt_text: str, max_tokens: int,
     return preflight_mod.gate(prompt_text, max_tokens, capacity, count_exact)
 
 
+def _new_stream_state() -> dict:
+    return {"content": [], "reasoning": [], "usage": None, "model_hint": None,
+            "ttft_ms": None, "logprobs": []}
+
+
+def _consume_chunk(state: dict, chunk: dict, t0: float) -> None:
+    """Fold one SSE chunk into the accumulated state (pure; unit-tested)."""
+    if state["model_hint"] is None and chunk.get("model"):
+        state["model_hint"] = chunk["model"]
+    if chunk.get("usage"):
+        state["usage"] = chunk["usage"]
+    for ch in chunk.get("choices", []):
+        d = ch.get("delta", {}) or {}
+        rc, c = d.get("reasoning_content"), d.get("content")
+        if rc or c:
+            if state["ttft_ms"] is None:
+                state["ttft_ms"] = (time.perf_counter() - t0) * 1000
+            if rc:
+                state["reasoning"].append(rc)
+            if c:
+                state["content"].append(c)
+        lp = ch.get("logprobs")
+        if lp:  # OpenAI stream shape: {"content": [{token, logprob, top_logprobs}]}
+            for entry in (lp.get("content") or []):
+                state["logprobs"].append({
+                    "token": entry.get("token"),
+                    "logprob": entry.get("logprob"),
+                    "top": [{"token": t.get("token"), "logprob": t.get("logprob")}
+                            for t in (entry.get("top_logprobs") or [])],
+                })
+
+
 def chat(base: int | str, messages: list[dict], model: str | None = None,
          max_tokens: int = 256, temperature: float | None = None,
          top_p: float | None = None, top_k: int | None = None,
          timeout: float = 300.0, preflight: bool | None = None,
-         preflight_capacity: dict | None = None) -> dict:
+         preflight_capacity: dict | None = None,
+         logprobs: bool | None = None, top_logprobs: int | None = None) -> dict:
     gate = preflight_gate(base, " ".join(str(m.get("content", "")) for m in messages),
                           max_tokens, model=model, enabled=preflight,
                           capacity=preflight_capacity)
@@ -166,13 +199,13 @@ def chat(base: int | str, messages: list[dict], model: str | None = None,
         body["top_p"] = top_p
     if top_k is not None:
         body["top_k"] = top_k
+    if logprobs or top_logprobs is not None:
+        body["logprobs"] = True
+        if top_logprobs is not None:
+            body["top_logprobs"] = int(top_logprobs)
 
-    content_parts: list[str] = []
-    reasoning_parts: list[str] = []
-    usage = None
-    model_hint = None
+    state = _new_stream_state()
     t0 = time.perf_counter()
-    ttft_ms = None
     with httpx.stream("POST", _base(base) + "/v1/chat/completions",
                       json=body, timeout=timeout) as r:
         if r.status_code >= 400:
@@ -187,27 +220,17 @@ def chat(base: int | str, messages: list[dict], model: str | None = None,
                 chunk = json.loads(payload)
             except json.JSONDecodeError:
                 continue
-            if model_hint is None and chunk.get("model"):
-                model_hint = chunk["model"]
-            if chunk.get("usage"):
-                usage = chunk["usage"]
-            for ch in chunk.get("choices", []):
-                d = ch.get("delta", {}) or {}
-                rc, c = d.get("reasoning_content"), d.get("content")
-                if rc or c:
-                    if ttft_ms is None:
-                        ttft_ms = (time.perf_counter() - t0) * 1000
-                    if rc:
-                        reasoning_parts.append(rc)
-                    if c:
-                        content_parts.append(c)
+            _consume_chunk(state, chunk, t0)
     total_ms = (time.perf_counter() - t0) * 1000
 
+    usage = state["usage"]
     out: dict[str, Any] = {"base": str(base),
-                           "content": "".join(content_parts),
-                           "reasoning": "".join(reasoning_parts) or None,
-                           "ttft_ms": round(ttft_ms) if ttft_ms is not None else None,
+                           "content": "".join(state["content"]),
+                           "reasoning": "".join(state["reasoning"]) or None,
+                           "ttft_ms": round(state["ttft_ms"]) if state["ttft_ms"] is not None else None,
                            "total_ms": round(total_ms)}
+    if state["logprobs"]:
+        out["logprobs"] = state["logprobs"]
     if usage:
         ct = usage.get("completion_tokens")
         if ct:
@@ -218,7 +241,7 @@ def chat(base: int | str, messages: list[dict], model: str | None = None,
             "cached_tokens": (usage.get("prompt_tokens_details") or {}).get("cached_tokens"),
         }
         record_usage(base, out, usage,
-                     resp_model=(usage.get("model") or model_hint or None), source="chat")
+                     resp_model=(usage.get("model") or state["model_hint"] or None), source="chat")
     if out["content"] == "" and out["reasoning"] is None:
         out["note"] = "无输出（可能 reasoning 预算耗尽或被截断）"
     return out
@@ -254,6 +277,8 @@ def complete(base: int | str, prompt: str, n_predict: int = 256,
                         "acceptance": round(da / dn, 3) if dn else None}
     if resp.get("tokens_cached") is not None:
         out["tokens_cached"] = resp["tokens_cached"]
+    if resp.get("completion_probabilities"):
+        out["completion_probabilities"] = resp["completion_probabilities"]
     out["stopped"] = [s for s in (resp.get("stop_reason"), resp.get("stopped_word")) if s]
     usage = {"prompt_tokens": timings.get("prompt_n"),
              "completion_tokens": timings.get("predicted_n")}

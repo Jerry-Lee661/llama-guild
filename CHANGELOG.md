@@ -5,6 +5,29 @@ All notable changes are documented here. Dates are 2026, UTC+8.
 
 ## Unreleased
 
+### Added
+
+- **`decide` MCP tool + `llama-decide` CLI** (20th tool): Jev-style atomic
+  decisions over constrained decoding — GBNF single-token letter grammar,
+  per-option probabilities read from `completion_probabilities` and
+  renormalized over the K letters (grammar masking preserves ratios), two
+  passes with swapped option order averaged against position bias, Jev
+  confidence `c=(pmax-1/K)/(1-1/K)`. Primitives: `choice` / `noul` /
+  `score`. Output includes `pass_choices` + `agree` so consumers can gate on
+  convergence. `n_probs` escalates to 256 once when letters are buried.
+  CLI exists because hooks/consumers cannot run MCP; JSON on stdout.
+- `chat` gains `logprobs` / `top_logprobs` (OpenAI-compatible fields); the
+  streaming chunk parser was extracted as `_consume_chunk` (pure, unit-tested).
+- `complete` now surfaces `completion_probabilities` when requested.
+
+> Verified live: mechanics against local instances (swap-averaging, escalation,
+> ~1.4-2.7s per decide on a 0.8B). **Calibration caveat (unchanged from the Jev
+> evaluation): probabilities are uncalibrated and, on models whose training
+> format differs from the letter prompt (e.g. the System One fine-tune that
+> expects its TypeSafe schema via `/v1/systemone`), readouts are out of
+> distribution — the `agree`/`warning` fields expose this. A `provider=systemone`
+> profile backend and threshold recalibration stay in the roadmap's C/D group.**
+
 ### Fixed
 
 - **`remote_host` profile key now parsed** (alias of `host`): three x99

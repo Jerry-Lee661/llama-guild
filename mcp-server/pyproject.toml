@@ -18,6 +18,7 @@ Homepage = "https://github.com/Jerry-Lee661/llama-guild"
 
 [project.scripts]
 llama-multimodel-mcp = "llama_multimodel_mcp.server:main"
+llama-decide = "llama_multimodel_mcp.decide:main"
 
 [build-system]
 requires = ["setuptools>=68"]

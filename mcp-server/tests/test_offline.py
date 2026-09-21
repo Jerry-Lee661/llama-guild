@@ -119,6 +119,93 @@ def test_pick_router_model_branches():
     assert pick_router_model([]) is None
 
 
+def test_build_grammar():
+    from llama_multimodel_mcp.decide import build_grammar
+    assert build_grammar(3) == 'root ::= "A" | "B" | "C"'
+    assert build_grammar(2) == 'root ::= "A" | "B"'
+
+
+def test_validate_options():
+    from llama_multimodel_mcp.decide import validate_options
+    validate_options(["a", "b"], "choice")
+    validate_options(["yes", "no"], "noul")
+    for bad in ([], ["a"], ["x"] * 27):
+        try:
+            validate_options(bad, "choice")
+            raise AssertionError(f"should reject {len(bad)} options")
+        except ValueError:
+            pass
+    try:
+        validate_options(["a", "b", "c"], "noul")
+        raise AssertionError("noul must take exactly 2")
+    except ValueError:
+        pass
+
+
+def test_extract_option_probs():
+    from llama_multimodel_mcp.decide import extract_option_probs
+    # this build's shape: top_logprobs with logprob (raw, pre-grammar) ->
+    # renormalized over the K letters
+    import math
+    cp = [{"token": "A", "top_logprobs": [
+        {"token": "\n\n", "logprob": math.log(0.6)},
+        {"token": " A", "logprob": math.log(0.3)},
+        {"token": "B", "logprob": math.log(0.1)},
+        {"token": "C", "logprob": math.log(0.05)}]}]
+    probs = extract_option_probs(cp, 3)
+    total = 0.3 + 0.1 + 0.05
+    assert abs(probs["A"] - 0.3 / total) < 1e-9
+    assert abs(probs["B"] - 0.1 / total) < 1e-9
+    # older/OpenAI-style shape: probs with prob values (already normalized)
+    cp2 = [{"token": "A", "probs": [
+        {"token": "A", "prob": 0.62}, {"token": "B", "prob": 0.38}]}]
+    probs2 = extract_option_probs(cp2, 2)
+    assert abs(probs2["A"] - 0.62) < 1e-9 and abs(probs2["B"] - 0.38) < 1e-9
+    try:
+        extract_option_probs([{"token": "A", "top_logprobs": [{"token": "A", "logprob": -0.1}]}], 2)
+        raise AssertionError("missing letter should raise")
+    except ValueError as e:
+        assert "n_probs" in str(e)
+
+
+def test_best_option():
+    from llama_multimodel_mcp.decide import best_option
+    probs = {"A": 0.2, "B": 0.7, "C": 0.1}
+    assert best_option(probs, ["x", "y", "z"]) == "y"
+    assert best_option({"A": 0.5, "B": 0.5}, ["x", "y"]) == "x"   # tie -> letter order
+
+
+def test_average_swaps_and_confidence():
+    from llama_multimodel_mcp.decide import average_swaps, confidence
+    # options [x, y, z]; pass2 displayed reversed: A=z B=y C=x
+    p1 = {"A": 0.6, "B": 0.3, "C": 0.1}
+    p2 = {"A": 0.2, "B": 0.3, "C": 0.5}   # A=z(0.2) B=y(0.3) C=x(0.5)
+    avg = average_swaps(p1, p2, 3)
+    assert avg["A"] == (0.6 + 0.5) / 2      # original option 0 = x
+    assert avg["B"] == 0.3
+    assert avg["C"] == (0.1 + 0.2) / 2      # original option 2 = z
+    assert confidence(1.0, 3) == 1.0
+    assert abs(confidence(1 / 3, 3)) < 1e-9
+    assert confidence(0.5, 1) == 1.0
+
+
+def test_consume_chunk_logprobs():
+    import time as _t
+    from llama_multimodel_mcp.llama_client import _consume_chunk, _new_stream_state
+    st = _new_stream_state()
+    _consume_chunk(st, {"model": "m", "choices": [{"delta": {"content": "A"},
+        "logprobs": {"content": [{"token": "A", "logprob": -0.7,
+                                  "top_logprobs": [{"token": "A", "logprob": -0.7},
+                                                   {"token": "B", "logprob": -1.2}]}]}}]}, _t.perf_counter())
+    _consume_chunk(st, {"usage": {"prompt_tokens": 5, "completion_tokens": 1},
+                        "choices": [{"delta": {"reasoning_content": "r"}}]}, _t.perf_counter())
+    assert st["content"] == ["A"] and st["reasoning"] == ["r"]
+    assert st["model_hint"] == "m" and st["usage"]["completion_tokens"] == 1
+    assert st["logprobs"][0]["token"] == "A"
+    assert st["logprobs"][0]["top"][1]["token"] == "B"
+    assert st["ttft_ms"] is not None
+
+
 def test_log_path_traversal_rejected():
     from llama_multimodel_mcp import process_mgr
     for evil in (r"..\..\evil", "../../etc/passwd", "/abs/path", "a/b", "..", "a..b"):

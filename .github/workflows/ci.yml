@@ -25,4 +25,4 @@ jobs:
         run: python -c "import json; [json.load(open(p, encoding='utf-8-sig')) for p in ['mcp-server/config.example.json','mcp-server/profiles.example.json','vscode/mcp.json.example','agents/marketplace.json']]; print('json ok')"
       - name: stdio smoke (19 tools listed)
         # NOTE: bump the expected count whenever a tool is added/removed.
-        run: python -c "from llama_multimodel_mcp.server import mcp; import asyncio; tools = asyncio.run(mcp.list_tools()); assert len(tools) == 19, len(tools); print('tools:', len(tools))"
+        run: python -c "from llama_multimodel_mcp.server import mcp; import asyncio; tools = asyncio.run(mcp.list_tools()); assert len(tools) == 20, len(tools); print('tools:', len(tools))"
