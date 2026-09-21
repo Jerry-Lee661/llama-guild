@@ -63,12 +63,17 @@ def _from_json(pid: str, d: dict) -> Profile:
             raw += [k] if v is None else [k, str(v)]
     port = d.get("port")
     base_url = d.get("base_url")
-    host = d.get("host")
+    # `remote_host` accepted as an alias: profiles written before the key was
+    # standardized on `host` would otherwise silently point at localhost.
+    host = d.get("host") or d.get("remote_host")
     if provider == "llama-server" and host:
-        h = str(host)
+        h = str(host).rstrip("/")
         if "://" not in h:
             h = "http://" + h
-        base_url = f"{h.rstrip('/') }:{port if port is not None else 8080}"
+        authority = h.split("://", 1)[1].split("/", 1)[0]
+        # only append the port when the host string has no explicit one —
+        # "http://192.168.2.104:8080" must not become "...:8080:8080"
+        base_url = h if ":" in authority else f"{h}:{port if port is not None else 8080}"
     remote = bool(provider == "llama-server" and base_url
                   and _host_is_remote(str(base_url)))
     if provider == "openai-compatible" and not base_url:

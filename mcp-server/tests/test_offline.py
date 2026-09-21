@@ -77,6 +77,48 @@ def test_provider_gating():
         assert "llama-server" in str(e)
 
 
+def test_remote_host_alias():
+    from llama_multimodel_mcp.profiles import _from_json
+    for key in ("host", "remote_host"):
+        p = _from_json("x99-a", {"provider": "llama-server", "port": 8080, key: "192.168.2.104"})
+        assert p.base_url == "http://192.168.2.104:8080", (key, p.base_url)
+        assert p.remote is True, key
+    # host carrying a full URL with its own port must not get a second :port
+    p = _from_json("x99-b", {"provider": "llama-server", "port": 8080,
+                             "remote_host": "http://192.168.2.104:8080"})
+    assert p.base_url == "http://192.168.2.104:8080", p.base_url
+    p = _from_json("x99-c", {"provider": "llama-server", "port": 9000,
+                             "host": "http://192.168.2.104:8080/"})
+    assert p.base_url == "http://192.168.2.104:8080", p.base_url
+
+
+def test_aggregate_profile_ports_shared_port():
+    from llama_multimodel_mcp.profiles import Profile
+    from llama_multimodel_mcp.server import aggregate_profile_ports
+    profs = [
+        Profile(id="a", port=8080, model="/m/a.gguf", tier="quality"),
+        Profile(id="b", port=8080, model="/m/b.gguf"),
+        Profile(id="c", port=8284, model=None),
+        Profile(id="lm", provider="openai-compatible", port=1234, model="m"),
+    ]
+    ports = aggregate_profile_ports(profs)
+    assert set(ports) == {"8080", "8284"}
+    assert [e["profile"] for e in ports["8080"]] == ["a", "b"]
+    assert ports["8080"][0]["model"] == "a.gguf" and ports["8080"][0]["tier"] == "quality"
+    assert ports["8284"][0]["model"] is None
+
+
+def test_pick_router_model_branches():
+    from llama_multimodel_mcp.server import pick_router_model
+    ok = [{"id": "m1", "state": "loaded"}, {"id": "m2", "state": "unloaded"}]
+    assert pick_router_model(ok) == "m1"
+    assert pick_router_model([{"id": "m1", "state": "unloaded"}]) is None
+    assert pick_router_model([{"id": "m1", "state": "loaded"},
+                              {"id": "m2", "state": "loaded"}]) is None
+    assert pick_router_model([{"model": "m3", "state": "loaded"}]) == "m3"
+    assert pick_router_model([]) is None
+
+
 def test_log_path_traversal_rejected():
     from llama_multimodel_mcp import process_mgr
     for evil in (r"..\..\evil", "../../etc/passwd", "/abs/path", "a/b", "..", "a..b"):

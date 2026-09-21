@@ -7,6 +7,21 @@ All notable changes are documented here. Dates are 2026, UTC+8.
 
 ### Fixed
 
+- **`remote_host` profile key now parsed** (alias of `host`): three x99
+  profiles written with `remote_host` were silently resolving to
+  `http://127.0.0.1:8080` instead of the LAN router
+  (`x99-orn-262k` / `x99-tiel-q6-n4` / `x99-tiel-q6-512k`); the runtime
+  profiles.json is normalized to `host`.
+- **`server_status.profile_ports` is now a list per port**: the old
+  dict-assignment kept only the last profile when several share one port
+  (the x99 router fronts 7 profiles on 8080). Entries carry
+  `{profile, tier, model}`.
+- **Router profile without a fixed model resolves explicitly**: `chat` on a
+  host profile with no model now queries `GET /models` — exactly one loaded
+  model is auto-used (never triggering autoload); zero or several loaded
+  raise an actionable error listing model states instead of failing
+  upstream.
+
 - mcp-server (context preflight): on router instances with `--parallel > 1`,
   `GET /models`' `meta.n_ctx` can report the GGUF *training* context (e.g.
   262144 for tiel-q6) instead of the real per-slot value (131072).

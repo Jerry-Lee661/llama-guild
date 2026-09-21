@@ -103,6 +103,34 @@ def _psutil_name(pid: int) -> str | None:
         return None
 
 
+def aggregate_profile_ports(profiles) -> dict:
+    """port -> list of profile entries. A list (not a single value): many
+    profiles legitimately share one port (e.g. a router fronting several
+    models), and the old dict-assignment silently kept only the last one."""
+    ports: dict[str, list[dict]] = {}
+    for pp in profiles:
+        if pp.port is not None and pp.provider == "llama-server":
+            ports.setdefault(str(pp.port), []).append({
+                "profile": pp.id,
+                "tier": pp.tier or None,
+                "model": os.path.basename(pp.model) if pp.model else None,
+            })
+    return ports
+
+
+def pick_router_model(items: list[dict]) -> str | None:
+    """Choose the model for a router profile that has no fixed model.
+
+    Exactly one loaded model -> use it (no autoload triggered). Zero or
+    several -> None so the caller can raise with actionable guidance."""
+    loaded = [m for m in items
+              if str(m.get("state", "")).lower() == "loaded"]
+    if len(loaded) == 1:
+        m = loaded[0]
+        return str(m.get("id") or m.get("model") or "") or None
+    return None
+
+
 # ---------- 1. profiles ----------
 
 @mcp.tool()
@@ -152,10 +180,7 @@ def server_status() -> dict:
     vram = process_mgr.vram_snapshot()
     over = {d: v for d, v in vram.get("by_device", {}).items()
             if v["used_estimated_gb"] > v["budget_gb"]}
-    ports: dict = {}
-    for pp in load_profiles()[0]:
-        if pp.port is not None and pp.provider == "llama-server":
-            ports[str(pp.port)] = {"profile": pp.id, "tier": pp.tier or None}
+    ports = aggregate_profile_ports(load_profiles()[0])
     return {"instances": instances, "vram": vram,
             "vram_note": "used 为估算值（profile weight_gb/vram_gb）；实时 VRAM 需构建支持" if instances else None,
             "budget_warning": ("GPU 池超预算: " + "; ".join(
@@ -351,6 +376,25 @@ def chat(profile_id: str | None = None, port: int | None = None,
     base, p = _target(profile_id, port)
     if model is None and p is not None and p.host and p.model:
         model = p.model
+    if model is None and p is not None and p.host and not p.model:
+        # router endpoint without a fixed model: resolve explicitly instead of
+        # failing upstream with an opaque error.
+        try:
+            items = llama_client._iter_models(llama_client.router_models(base))
+        except llama_client.LlamaHTTPError as e:
+            raise ValueError(
+                f"profile {p.id} 是远程 router 档且未指定 model，且无法查询 /models"
+                f"（{e}）；请显式传 model=<模型 id>") from e
+        picked = pick_router_model(items)
+        if picked is None:
+            states = ", ".join(
+                f"{m.get('id') or m.get('model')}:{m.get('state', '?')}"
+                for m in items) or "(无)"
+            raise ValueError(
+                f"profile {p.id} 未指定 model，且 router 上没有恰好一个已加载模型"
+                f"（自动挑选仅在唯一 loaded 时生效，避免触发 autoload）。"
+                f"当前: {states}；请显式传 model=<模型 id>，或用 router_load 先加载目标模型")
+        model = picked
     capacity = None
     if p is not None and p.provider != "llama-server" and p.ctx:
         # openai-compatible: no /props //tokenize — heuristic gate on the
