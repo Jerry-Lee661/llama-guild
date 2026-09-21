@@ -61,6 +61,11 @@ slot 占死已由 parallel=2 解决（2026-09-18 复核 /models：--parallel 2 �
 本地模型先过滤"哪些请求值得惊动云端"，API 调用量减半。会改变"云端永远规划"的
 核心流，作为可选的成本敏感模式评估。
 
+> 前置已交付：`decide` 工具 + `llama-decide` CLI（Unreleased）——GBNF 单 token
+> 判定、双遍顺序交换平均、Jev 置信度公式；`pass_choices`/`agree` 供消费者门控。
+> 注意：概率未校准，且 System One 微调引擎需走 `/v1/systemone` 训练格式
+> （`provider=systemone` 档位支持仍属待办）。
+
 ## v0.3+（待触发立项）
 
 ### 反向代理模式——B 层（保护微信 bot 直连链路）
