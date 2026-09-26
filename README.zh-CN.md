@@ -87,14 +87,15 @@ VS Code、DSH、pi、omp、opencode。本地模型连不上时流程自动降级
   动作，置信度 0.9985-0.9989，单步 165-569ms；加固适配器（v16a2）把伪造选项
   块攻击的掉分从 -47.7pp 收到 +1.2pp。
 
-## 计划中：workflow-mm
+## workflow-mm：把工作流装进一个 skill
 
-一个**跨 harness 的泛用契约工作流 skill**（初稿在 `~/.agents/skills/workflow-mm`，
-稳定后随本仓库的 `setup` 分发）：与上述 skill 同一套"契约-派发-验收"骨架，
-但收敛为单个 skill，任何 agent 工具都能跑。每次运行可选模型（会话模型 /
-本地 default 档 / 列出路由挑一档）；派发双路径（宿主有子代理就每个任务包
-开子代理，没有就走主上下文内嵌的 local-executor 契约模式）；进度落盘
-`workflow-state.md`，中断后可跨会话续跑。
+`workflow-mm` 把同一套"契约-派发-验收"骨架收敛为单个 skill，任何 agent 工具
+都能跑（不依赖子代理机制）：每次运行可选模型（会话模型 / 本地 default 档 /
+列出路由挑一档）；派发双路径（宿主有子代理走子代理，没有走内嵌
+local-executor 契约模式）；宿主掐断 MCP 长调用时退 HTTP 直连；进度落盘
+`workflow-state.md`，中断后跨会话续跑。2026-09-26 实测通过：两包 Python 微
+工具库在 qwen35-4b 上端到端完成（每包 21-31 秒，pytest 退出码把关，一轮打回
+抓出契约自相矛盾，中断后从状态文件续跑）。
 
 ## 快速开始
 

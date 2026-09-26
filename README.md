@@ -104,16 +104,18 @@ instead of the cloud model.
   hardened adapter (v16a2) closes the forged-options-block gap from -47.7 pp
   to +1.2 pp.
 
-### Coming: workflow-mm
+### workflow-mm: the workflow as one skill
 
-A **harness-agnostic contract workflow skill** (draft lives in
-`~/.agents/skills/workflow-mm`, ships with this repo's `setup` once stable):
-same contract-dispatch-accept skeleton as the skills above, but driven as one
-skill for any agent tool: model selection per run (session model, the local
-`default` profile, or picking from a listed route), dual dispatch (subagent
-when available, embedded local-executor otherwise), and a `workflow-state.md`
-file as the portable progress record, so a run can be resumed across
-sessions.
+`workflow-mm` packs the same contract-dispatch-accept skeleton into a single
+skill any agent tool can run (no subagent mechanics required): model
+selection per run (session model / the local `default` profile / pick from a
+listed route), dual dispatch (subagent when the host has them, embedded
+local-executor otherwise), HTTP fallback when the host caps MCP calls, and a
+`workflow-state.md` progress file so an interrupted run resumes across
+sessions. Field-verified 2026-09-26: a two-package Python micro-library was
+built end to end on qwen35-4b (21-31 s per package, pytest exit codes as the
+gate, one retry round caught a self-contradictory contract, and an
+interrupted run resumed from the state file).
 
 ## Quick start
 

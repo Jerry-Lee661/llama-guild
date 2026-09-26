@@ -5,7 +5,7 @@
 
 ## 未发布
 
-### 新增 —— mcp-server（判定层）
+### 新增：mcp-server（判定层）
 
 - **`decide_batch` MCP 工具 + `llama-decide-batch` CLI**（第 21 个工具）：同一 state 的
   N 道判定题合成一次 `/v1/systemone` 往返（需 System One schema 端点，即 GP 侧
@@ -33,12 +33,14 @@
   `permission-review`、`claim-check`、`entity-extract`、`intent-router`、
   `state-judge`，外加 `context-compaction`（其"每个工具调用两问"的循环已改走
   `decide_batch`）。
-- **workflow-mm skill（初稿，仓库外）**：跨 harness 的泛用契约工作流，把
-  "契约-派发-验收"骨架收敛为单个 skill，任何 agent 工具可用。每次运行可选
-  模型（会话模型 / 本地 default 档 / 列出路由挑一档）；派发双路径（宿主有
-  子代理走子代理，没有走内嵌 local-executor 契约模式）；进度落盘
-  `workflow-state.md`，可跨会话续跑。初稿在 `~/.agents/skills/workflow-mm`，
-  实测稳定后随 `setup` 分发入库。
+- **`workflow-mm` skill（第 5 个 skill，入库 `skills/`）**：跨 harness 的泛用
+  契约工作流，把"契约-派发-验收"骨架收敛为单个 skill，任何 agent 工具可用。
+  每次运行可选模型（会话模型 / 本地 default 档 / 列出路由挑一档）；派发双
+  路径（宿主有子代理走子代理，没有走内嵌 local-executor 契约模式）；宿主对
+  单次 MCP 调用有短上限（常见 ~30 秒，整文件生成不够用）时退 HTTP 直连；
+  进度落盘 `workflow-state.md`，可跨会话续跑。qwen35-4b 端到端实测：两包
+  构建、pytest 退出码把关、一轮打回暴露契约自相矛盾（修契约侧解决）、中断
+  后从状态文件续跑。
 
 > 实测记录：单题 decide 的阈值复核在 v14_s0 上全过：5 条权限参考命令全部给出
 > 预期动作（`rm -rf ~` 拒、`git status` 放行、`curl | sh` 拒、

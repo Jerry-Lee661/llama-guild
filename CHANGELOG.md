@@ -63,13 +63,17 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   `entity-extract`, `intent-router`, `state-judge`, plus
   `context-compaction` (its two-questions-per-tool-call loop now rides
   `decide_batch`).
-- **workflow-mm skill (draft, outside the repo)**: a harness-agnostic
+- **`workflow-mm` skill (5th skill, now in `skills/`)**: a harness-agnostic
   contract workflow that wraps the contract-dispatch-accept skeleton into one
   skill for any agent tool: per-run model choice (session model / local
   `default` profile / pick from a listed route), dual dispatch (subagent when
-  the host has them, embedded local-executor otherwise), and
-  `workflow-state.md` as a portable, resumable progress record. Draft at
-  `~/.agents/skills/workflow-mm`; ships with `setup` once field-tested.
+  the host has them, embedded local-executor otherwise), HTTP fallback when
+  the host caps single MCP calls (~30 s on some hosts, too short for whole-
+  file generation), and `workflow-state.md` as a portable, resumable progress
+  record. Field-verified end to end on qwen35-4b: two-package build, pytest
+  exit-code gates, a retry round that surfaced a self-contradictory contract
+  (fixed on the contract side), and an interrupted run resumed from the state
+  file.
 
 ### Fixed
 
