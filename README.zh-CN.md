@@ -65,8 +65,9 @@ VS Code、DSH、pi、omp、opencode。本地模型连不上时流程自动降级
 |---|---|
 | 流程分工 | `planner` / `orchestrator` / `local-executor` / `setup` 四个 skill 各管一个角色；没有契约的简单杂务（整理资料、提取信息、改写文字）也按类型清单派给本地模型 |
 | 执行保障 | 动手前先自评把握，关键信息缺失就上报 `NEEDS_CONTEXT`，不硬写；本地模型反复失败时向云端要一次诊断，带着建议做最后一次尝试；有效的解法记进 `.guild/lessons.md`，同一个坑不踩第二次 |
+| 原子判定 | `decide` 把"是/否、多选一、打分"这类封闭判定交给本地模型：GBNF 约束解码限定单 token 作答，返回各选项概率和置信度；把选项顺序对调再测一遍取平均，消除顺序偏差；概率未经校准，只作排序参考，调用方用 `pass_choices`/`agree` 字段把关。另配 `llama-decide` CLI，给调不了 MCP 的 hook 用 |
 | 成本与防护 | 发送前检查上下文长度（llama.cpp 按 token 精确计算，其他后端估算），超限返回 `context_exceeded` 错误；显存按显卡分池管控；不想用这套流程时，一个脚本就能把 skill 整体关掉 |
-| 运行指标 | `chat`/`complete` 返回首字延迟和投机解码接受率；`bench` 支持速度 / 首字延迟 / 预填充 / 长上下文四种测试；`usage_stats` 查看 token 用量，仅存本地 |
+| 运行指标 | `chat`/`complete` 返回首字延迟和投机解码接受率，`chat` 还可返回逐 token 概率（logprobs）；`bench` 支持速度 / 首字延迟 / 预填充 / 长上下文四种测试；`usage_stats` 查看 token 用量，仅存本地 |
 
 ## 快速开始
 
@@ -106,7 +107,8 @@ powershell -File install\install.ps1     # 或 bash install/install.sh
 ## Provider 与平台
 
 - **llama.cpp `llama-server`**：全部功能可用：启动/停止/切换模型、router 热切换、
-  原生 `/completion` 采样控制、投机解码统计、基准测试、发送前按 token 精确计算长度。
+  原生 `/completion` 采样控制、投机解码统计、基准测试、发送前按 token 精确计算长度、
+  GBNF 约束解码判定（`decide`）。
 - **OpenAI 兼容**：LM Studio、Ollama(`/v1`)、vLLM、llama-swap。当前支持推理和统计，
   上下文长度只能估算；原生的启停管理在计划中。
 - **平台**：Windows 经过完整测试；macOS/Linux 为实验性支持（进程管理基于 psutil）。

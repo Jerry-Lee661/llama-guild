@@ -24,6 +24,7 @@ class Profile:
     base_url: str | None = None             # openai-compatible, or llama-server with host
     host: str | None = None                 # llama-server on another machine -> remote
     remote: bool = False                    # lifecycle tools refuse remote profiles
+    router: bool = False                    # router fronting several models (needs a model id)
     device: str = "default"                 # GPU pool: gpu0 / gpu1 / default / ...
     flags: dict = field(default_factory=dict)
     raw_args: list[str] = field(default_factory=list)  # launch tokens after exe
@@ -34,6 +35,7 @@ class Profile:
     needs_rocm_path: bool = False
     orphaned_flags: list[str] = field(default_factory=list)
     line: int = 0
+    decide: dict = field(default_factory=dict)  # decision-backend policy (see decide.py)
 
 
 def _host_is_remote(url: str) -> bool:
@@ -90,10 +92,12 @@ def _from_json(pid: str, d: dict) -> Profile:
         draft_model=d.get("draft_model"), mmproj=d.get("mmproj"),
         port=port, ctx=d.get("ctx"), base_url=base_url,
         host=str(host) if host else None, remote=remote,
+        router=bool(d.get("router")),
         device=d.get("device") or "default",
         flags=flags, raw_args=raw, description=d.get("description", ""),
         weight_gb=d.get("weight_gb"), vram_gb=d.get("vram_gb"),
         removed=bool(d.get("removed")),
+        decide=dict(d.get("decide") or {}),
     )
 
 
