@@ -16,6 +16,15 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   `score`. Output includes `pass_choices` + `agree` so consumers can gate on
   convergence. `n_probs` escalates to 256 once when letters are buried.
   CLI exists because hooks/consumers cannot run MCP; JSON on stdout.
+- **`decide_batch` MCP tool + `llama-decide-batch` CLI** (21st tool): N
+  questions over one shared state in a single `/v1/systemone` round trip
+  against a System One schema endpoint (the GP-side
+  `training/sysone_endpoint.py`). The endpoint does the two-pass
+  swap-averaging server-side; per-question policy (rules / min_confidence /
+  fail_mode) applies here on the returned distributions; each question
+  consults the decide TTL cache first, so compaction-style repeat rounds
+  (same state, same two questions) cost zero network. Stdin accepts the
+  official `{id: {question, options}}` shape unchanged.
 - `chat` gains `logprobs` / `top_logprobs` (OpenAI-compatible fields); the
   streaming chunk parser was extracted as `_consume_chunk` (pure, unit-tested).
 - `complete` now surfaces `completion_probabilities` when requested.

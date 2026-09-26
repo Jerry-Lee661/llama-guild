@@ -477,9 +477,199 @@ def test_preflight_capacity_and_gate():
     assert pf.gate("x" * 10**7, 4096, None, count_exact=lambda m: 1) is None
 
 
+def test_build_messages_sysone_contract():
+    """format=sysone must render the training contract: system = JUDGE_SYSTEM,
+    user = [QUESTION] -> [OPTIONS] -> [STATE] (state last)."""
+    from llama_multimodel_mcp.decide import SYSONE_SYSTEM, build_messages
+    msgs = build_messages("Which queue?", ["billing: money", "support: bugs"], "Subject: refund")
+    assert msgs[0] == {"role": "system", "content": SYSONE_SYSTEM}
+    body = msgs[1]["content"]
+    assert body.startswith("[QUESTION]\nWhich queue?")
+    assert "[OPTIONS]\nA. billing: money\nB. support: bugs" in body
+    assert body.rstrip().endswith("[STATE]\nSubject: refund")
+    assert body.index("[QUESTION]") < body.index("[OPTIONS]") < body.index("[STATE]")
+    # the system text is the one the engine was trained with, verbatim
+    assert SYSONE_SYSTEM.startswith("You are a judgment engine.")
+    assert "EXACTLY ONE letter" in SYSONE_SYSTEM
+
+
+def test_option_name_and_policy():
+    from llama_multimodel_mcp.decide import apply_policy, option_name
+    assert option_name("deny: Destructive, dangerous") == "deny"
+    assert option_name("allow") == "allow"
+    assert option_name("score 3: high") == "score 3"
+
+    rules = [{"option": "deny", "min_prob": 0.30, "action": "deny"},
+             {"option": "allow", "min_prob": 0.60, "action": "allow"}]
+    # a rule wins over the argmax (the conservative direction)
+    v = apply_policy({"allow": 0.10, "ask": 0.40, "deny": 0.50}, "ask", 0.25,
+                     {"rules": rules, "min_confidence": 0.5, "fail_mode": "ask"})
+    assert v["action"] == "deny" and not v["low_confidence"]
+    # no rule fires and confidence is under the gate -> fail_mode
+    v = apply_policy({"allow": 0.35, "ask": 0.45, "deny": 0.20}, "ask", 0.175,
+                     {"rules": rules, "min_confidence": 0.5, "fail_mode": "keep"})
+    assert v["action"] == "keep" and v["low_confidence"]
+    # confident argmax stands when no policy is set
+    v = apply_policy({"yes": 0.9, "no": 0.1}, "yes", 0.8, None)
+    assert v["action"] == "yes" and v["reason"] == "argmax"
+    # rules for options that are not in this question are inert
+    v = apply_policy({"yes": 0.9, "no": 0.1}, "yes", 0.8, {"rules": rules})
+    assert v["action"] == "yes"
+
+
+def test_extract_letter_probs_from_chat():
+    import math
+    from llama_multimodel_mcp.decide import extract_letter_probs_from_chat
+    resp = {"choices": [{"logprobs": {"content": [{"top_logprobs": [
+        {"token": "C", "logprob": math.log(0.5)},
+        {"token": "A", "logprob": math.log(0.3)},
+        {"token": "B", "logprob": math.log(0.2)},
+        {"token": "D", "logprob": math.log(0.9)},   # outside A..C -> ignored
+    ]}]}}]}
+    probs, missing = extract_letter_probs_from_chat(resp, 3)
+    assert missing == []                          # D is outside A..C -> ignored
+    assert abs(sum(probs.values()) - 1.0) < 1e-9
+    assert probs["C"] > probs["A"] > probs["B"]
+    # k=4: D is a candidate and it is present
+    probs, missing = extract_letter_probs_from_chat(resp, 4)
+    assert missing == [] and probs["D"] > probs["C"]
+    # a candidate outside top_logprobs is reported, not fatal
+    probs, missing = extract_letter_probs_from_chat(resp, 5)
+    assert missing == ["E"] and abs(sum(probs.values()) - 1.0) < 1e-9
+    # nothing usable at all -> explicit error
+    try:
+        extract_letter_probs_from_chat({"choices": [{}]}, 2)
+        raise AssertionError("should reject a response without letter logprobs")
+    except ValueError:
+        pass
+
+
+def test_profile_decide_block_and_router_flag():
+    from llama_multimodel_mcp.profiles import _from_json
+    p = _from_json("qjev", {
+        "provider": "llama-server", "host": "192.168.2.104", "port": 8280,
+        "decide": {"format": "sysone", "min_confidence": 0.5, "fail_mode": "ask"},
+    })
+    assert p.decide["format"] == "sysone" and p.decide["fail_mode"] == "ask"
+    assert p.base_url == "http://192.168.2.104:8280" and p.remote
+    # a remote single-model endpoint is not a router, so decide needs no model id
+    assert p.router is False
+    assert _from_json("r", {"host": "192.168.2.104", "port": 8080, "router": True}).router is True
+
+
+def test_decide_cache_key_and_ttl():
+    from llama_multimodel_mcp import decide as d
+    k1 = d.cache_key("http://x:1", "q", ["a", "b"], "s", "sysone", None, "choice")
+    assert k1 == d.cache_key("http://x:1", "q", ["a", "b"], "s", "sysone", None, "choice")
+    # state, format, options and base are all part of the key
+    assert k1 != d.cache_key("http://x:1", "q", ["a", "b"], "s2", "sysone", None, "choice")
+    assert k1 != d.cache_key("http://x:1", "q", ["a", "b"], "s", "plain", None, "choice")
+    assert k1 != d.cache_key("http://x:1", "q", ["b", "a"], "s", "sysone", None, "choice")
+    assert k1 != d.cache_key("http://y:1", "q", ["a", "b"], "s", "sysone", None, "choice")
+    d.cache_put(k1, {"choice_name": "a"})
+    assert d.cache_get(k1) == {"choice_name": "a"}
+    old = d._CACHE_TTL
+    try:
+        d._CACHE_TTL = 0                      # TTL 0 disables the cache entirely
+        assert d.cache_get(k1) is None
+        d.cache_put(k1, {"choice_name": "b"})
+        assert d.cache_get(k1) is None
+    finally:
+        d._CACHE_TTL = old
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:
         fn()
         print(f"PASS {fn.__name__}")
     print(f"{len(fns)} tests passed")
+
+
+def test_decide_batch_payload_policy_and_cache():
+    from llama_multimodel_mcp import decide as d
+
+    captured = {}
+
+    def fake_request(base, method, path, body=None, timeout=30.0):
+        captured["base"], captured["path"], captured["body"] = base, path, body
+        return {"answers": {
+            "q1": {"type": "choice", "choice": "deny",
+                   "probabilities": {"ask": 0.01, "allow": 0.004, "deny": 0.986},
+                   "confidence": 0.979},
+            "q2": {"type": "noul", "noul": 0.9},
+        }, "usage": {"input_tokens": 100, "output_tokens": 2, "cached_tokens": 0},
+           "labels_verified": True}
+
+    real_request, real_ttl = d.llama_client.request, d._CACHE_TTL
+    cache_snapshot = dict(d._CACHE)
+    d.llama_client.request = fake_request
+    d._CACHE_TTL, d._CACHE = 300, {}
+    qs = [{"id": "q1", "question": "Allow this tool call?",
+           "options": ["ask: side effects", "allow: read-only", "deny: destructive"]},
+          {"id": "q2", "question": "Is the statement true?",
+           "options": ["yes: true", "no: false"], "primitive": "noul"}]
+    try:
+        out = d.run_decide_batch("http://127.0.0.1:8301", "Tool call: `rm -rf ~`", qs,
+                                 policy={"min_confidence": 0.5, "fail_mode": "ask"},
+                                 profile_id="t")
+    finally:
+        d.llama_client.request, d._CACHE_TTL, d._CACHE = real_request, real_ttl, cache_snapshot
+
+    # one round trip, sysone path, criteria rendered as the name->desc map
+    assert captured["path"] == "/v1/systemone"
+    body = captured["body"]
+    assert body["questions"]["q1"]["criteria"] == {
+        "ask": "side effects", "allow": "read-only", "deny": "destructive"}
+    assert body["questions"]["q2"]["type"] == "noul"
+    # per-question policy applied on the returned distributions
+    a1, a2 = out["answers"]["q1"], out["answers"]["q2"]
+    assert a1["action"] == "deny" and a1["choice_name"] == "deny"
+    assert a1["probabilities"]["deny"] == 0.986
+    assert a2["choice_name"] == "yes" and a2["confidence"] == 0.8   # K=2 Jev: |2p-1|
+    assert out["usage"]["input_tokens"] == 100 and out["n_questions"] == 2
+
+    # identical second round: every question answered from the TTL cache, no network
+    def no_network(*a, **kw):
+        raise AssertionError("network hit on cache-only round")
+    d.llama_client.request = no_network
+    d._CACHE_TTL, d._CACHE = 300, dict(d._CACHE)
+    try:
+        out2 = d.run_decide_batch("http://127.0.0.1:8301", "Tool call: `rm -rf ~`", qs,
+                                  policy={"min_confidence": 0.5, "fail_mode": "ask"})
+    finally:
+        d.llama_client.request, d._CACHE_TTL, d._CACHE = real_request, real_ttl, cache_snapshot
+    assert out2["answers"]["q1"]["cached"] is True
+    assert out2["answers"]["q2"]["cached"] is True
+
+
+def test_decide_batch_validation_and_errors():
+    from llama_multimodel_mcp import decide as d
+    # the shared state is part of the sysone contract
+    try:
+        d.run_decide_batch("http://x", "", [{"question": "q", "options": ["a: x", "b: y"]}])
+        assert False, "empty state must raise"
+    except ValueError as e:
+        assert "state" in str(e)
+    # duplicate question ids
+    try:
+        d.run_decide_batch("http://x", "s", [
+            {"id": "q1", "question": "q", "options": ["a", "b"]},
+            {"id": "q1", "question": "q2", "options": ["a", "b"]}])
+        assert False, "duplicate id must raise"
+    except ValueError as e:
+        assert "q1" in str(e)
+    # an endpoint error answer degrades to fail_mode instead of raising
+    def fake_request(*a, **kw):
+        return {"answers": {"q1": {"type": "choice", "error": "label check failed"}},
+                "usage": {}}
+    real = d.llama_client.request
+    d.llama_client.request = fake_request
+    try:
+        out = d.run_decide_batch("http://x", "s",
+                                 [{"question": "q", "options": ["a: x", "b: y"]}],
+                                 policy={"fail_mode": "ask"})
+    finally:
+        d.llama_client.request = real
+    assert out["answers"]["q1"]["action"] == "ask"
+    assert "error" in out["answers"]["q1"]

@@ -37,6 +37,13 @@
 
 ### 新增 —— mcp-server（0.1.1 + 上下文预检）
 
+- **`decide_batch` MCP 工具 + `llama-decide-batch` CLI**（第 21 个工具）：同一 state 的
+  N 道判定题合成一次 `/v1/systemone` 往返（需 System One schema 端点，即 GP 侧
+  `training/sysone_endpoint.py`）。两遍顺序交换平均由端点完成；逐题策略
+  （rules / min_confidence / fail_mode）在本地应用于返回分布；每题先查 decide TTL
+  缓存，compaction 式重复轮次（同 state 同两问）零网络开销。stdin 直接接受官方
+  `{id: {question, options}}` 形态。配套阈值复核：v14_s0 引擎上 5 条权限参考命令
+  全部给出预期动作，deny≥0.30 / allow≥0.60 规则路径无错动作。
 - **上下文预检（A 层，ROADMAP #0）**：`chat`/`complete` 在进入 slot 队列前
   过两道闸——字符/token 启发式（零网络拦截荒谬请求；openai-compatible 的唯一
   一道）+ `POST /tokenize` 精确计数（HTTP 层处理，永不进入 slot 队列；仅对

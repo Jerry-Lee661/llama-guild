@@ -156,6 +156,8 @@ def list_profiles(include_removed: bool = False) -> dict:
                           if k in ("--spec-type", "--spec-draft-n-max", "--reasoning",
                                    "--temp", "--top-p", "--top-k", "--n-predict")},
             "note": p.description[:200],
+            "decide": ({k: p.decide[k] for k in ("format", "min_confidence", "fail_mode")
+                        if k in p.decide} or None),
         })
     return {"count": len(out), "default": default, "profiles": out, "issues": issues or None}
 
@@ -378,7 +380,7 @@ def chat(profile_id: str | None = None, port: int | None = None,
     base, p = _target(profile_id, port)
     if model is None and p is not None and p.host and p.model:
         model = p.model
-    if model is None and p is not None and p.host and not p.model:
+    if model is None and p is not None and p.router and not p.model:
         # router endpoint without a fixed model: resolve explicitly instead of
         # failing upstream with an opaque error.
         try:
@@ -470,21 +472,55 @@ def read_server_log(profile_id: str, tail: int = 200) -> dict:
 def decide(profile_id: str | None = None, port: int | None = None,
            question: str = "", options: list[str] | None = None,
            primitive: str = "choice", system: str | None = None,
-           n_probs: int | None = None, timeout_seconds: float = 120.0) -> dict:
-    """Jev 式原子判定：把"K 选一/是-否"问题用约束解码（GBNF 单 token 字母）问本地模型，返回选项概率分布与置信度。两遍选项顺序交换取平均消除位置偏置；置信度用 Jev 公式 c=(pmax−1/K)/(1−1/K)。primitive: choice(K≤26) / noul(yes-no) / score(有序)。概率未经校准——只作排序参考。"""
+           n_probs: int | None = None, timeout_seconds: float = 120.0,
+           state: str | None = None, format: str | None = None) -> dict:
+    """Jev 式原子判定：把"K 选一/是-否"问题用约束解码（GBNF 单 token 字母）问本地模型，返回选项概率分布与置信度。两遍选项顺序交换取平均消除位置偏置；置信度用 Jev 公式 c=(pmax−1/K)/(1−1/K)。primitive: choice(K≤26) / noul(yes-no) / score(有序)。format=sysone 走 System One 训练契约（[QUESTION]/[OPTIONS]/[STATE]，需 state），用于 QJev 微调引擎；默认 plain。profile 的 decide 策略（rules/min_confidence/fail_mode）决定返回的 action。概率未经校准——只作排序参考。"""
     if not question or not options:
         raise ValueError("需要 question 与 options")
     base, p = _target(profile_id, port)
+    policy = dict(p.decide or {}) if p is not None else None
+    fmt = format or (policy or {}).get("format") or "plain"
+    system = system or (policy or {}).get("system")
     _need(p, "complete_native", None if isinstance(base, int) else port)
     model = None
     if p is not None:
-        if p.host and not p.model:
+        if p.router and not p.model:
             raise ValueError(f"profile {p.id} 是 router 档且未指定 model；decide 需要明确 "
                              "model（在 profile 增加 model 字段，或改用具体模型档位）")
         model = p.model or None
-    return decide_mod.run_decide(base, question, list(options), primitive=primitive,
-                                 system=system, n_probs=n_probs, timeout=timeout_seconds,
-                                 model=model)
+    try:
+        return decide_mod.run_decide(base, question, list(options), primitive=primitive,
+                                     system=system, n_probs=n_probs,
+                                     timeout=timeout_seconds, model=model, state=state,
+                                     fmt=fmt, policy=policy, profile_id=profile_id)
+    except (ValueError, llama_client.LlamaHTTPError) as e:
+        fail = (policy or {}).get("fail_mode")
+        if not fail:
+            raise
+        return {"error": str(e), "action": fail, "low_confidence": True,
+                "reason": f"unavailable -> fail_mode {fail}", "degraded": "unavailable"}
+
+
+@mcp.tool()
+def decide_batch(profile_id: str | None = None, port: int | None = None,
+                 state: str = "", questions: list[dict] | None = None,
+                 timeout_seconds: float = 300.0) -> dict:
+    """批量判定：同一 state 的多道判定题合成一次 /v1/systemone 往返（仅 System One schema 端点支持，如 training/sysone_endpoint.py 起的 8301；llama.cpp 原生端点无此路径）。questions: [{id?, question, options:["name: desc",...], primitive?}]。端点侧完成两遍顺序交换平均，本地按 profile 的 decide 策略（rules/min_confidence/fail_mode）给每题 action；每题先查 TTL 缓存，compaction 的"每次 tool call 两问"重复轮次零网络开销。"""
+    if not state or not questions:
+        raise ValueError("需要 state 与 questions")
+    base, p = _target(profile_id, port)
+    policy = dict(p.decide or {}) if p is not None else None
+    model = p.model or None if p is not None else None
+    try:
+        return decide_mod.run_decide_batch(base, state, [dict(q) for q in questions],
+                                           model=model, timeout=timeout_seconds,
+                                           policy=policy, profile_id=profile_id)
+    except (ValueError, llama_client.LlamaHTTPError) as e:
+        fail = (policy or {}).get("fail_mode")
+        if not fail:
+            raise
+        return {"error": str(e), "action": fail, "low_confidence": True,
+                "reason": f"unavailable -> fail_mode {fail}", "degraded": "unavailable"}
 
 
 @mcp.tool()

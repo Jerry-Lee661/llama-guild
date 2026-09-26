@@ -65,6 +65,10 @@ slot 占死已由 parallel=2 解决（2026-09-18 复核 /models：--parallel 2 �
 > 判定、双遍顺序交换平均、Jev 置信度公式；`pass_choices`/`agree` 供消费者门控。
 > 注意：概率未校准，且 System One 微调引擎需走 `/v1/systemone` 训练格式
 > （`provider=systemone` 档位支持仍属待办）。
+> 批量已交付：`decide_batch` 工具 + `llama-decide-batch` CLI（Unreleased）——
+> 同一 state 的 N 题合成一次 `/v1/systemone` 往返，接 GP 侧
+> `training/sysone_endpoint.py`（QJev v14_s0 实栈验证）；逐题策略本地应用，
+> TTL 缓存让 compaction 重复轮次零网络。
 
 ## v0.3+（待触发立项）
 
