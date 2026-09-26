@@ -51,7 +51,11 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   block augmentation) closes the state-injection gap on `permissions_real`
   from -47.7 pp / 48-of-86 flips (v14_s0) to +1.2 pp / 1-of-86, with plain
   accuracy intact (93.0% on the local CPU stack). A collapsed model void-passes
-  the gap check, so the plain floor and the gap are checked jointly.
+  the gap check, so the plain floor and the gap are checked jointly. The
+  production endpoint (X99:8280) was swapped to v16a3_s1 on 2026-09-27 via
+  hot relaunch and re-verified in place: plain 89.5%, forged gap +3.5 pp
+  (3/86), conjunctive acceptance passed; the probe run is now the regression
+  gate for every engine swap.
 - **Browser-action scoring verified on real sites**: with the
   `local-browser-use` posture (the host enumerates interactive elements into
   bounded action tuples; the model never writes a selector), v14_s0 picked
