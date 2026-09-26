@@ -167,6 +167,7 @@ llama-guild 只做一件事：把契约、派发、验收这套多模型分工�
   [参考基线](docs/BENCHMARKS.zh.md) ·
   [DSH 接入](dsh/README.md) · [opencode](opencode/README.md) · [MCP server](mcp-server/README.md)
 - [方法论（中文完整版）](docs/WORKFLOW.zh.md) / [Methodology (EN core)](docs/WORKFLOW.en.md)
+- [浏览器环境声明](docs/BROWSER-USE.zh.md)：三种后端（内嵌/扩展/无头）与判定层的接线
 
 欢迎参与贡献，见 [CONTRIBUTING.md](CONTRIBUTING.md)；安全问题见
 [SECURITY.md](SECURITY.md)；MIT 许可（[LICENSE](LICENSE)）。

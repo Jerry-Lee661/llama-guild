@@ -196,6 +196,7 @@ verifiable install.
   [Reference baselines](docs/BENCHMARKS.zh.md) ·
   [DSH](dsh/README.md) · [opencode](opencode/README.md) · [MCP server](mcp-server/README.md)
 - [Methodology (EN core)](docs/WORKFLOW.en.md) / [方法论（中文完整版）](docs/WORKFLOW.zh.md)
+- [Browser environment declaration](docs/BROWSER-USE.zh.md): the three browser backends and how the judgment layer wires into them
 
 Contributions welcome, see [CONTRIBUTING.md](CONTRIBUTING.md). Security
 issues: [SECURITY.md](SECURITY.md). MIT licensed ([LICENSE](LICENSE)).

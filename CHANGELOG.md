@@ -63,6 +63,14 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   `entity-extract`, `intent-router`, `state-judge`, plus
   `context-compaction` (its two-questions-per-tool-call loop now rides
   `decide_batch`).
+- **Browser environment declaration (`docs/BROWSER-USE.zh.md`)**: the three
+  browser backends behind the browser-use skill (`iab` in-app / `extension`
+  bridge to your real Chrome / `cdp` headless), availability-by-advertisement
+  discipline, and the wiring to the judgment layer's browser-action scoring.
+  Referenced from workflow-mm contract dimension 4 when a contract involves
+  browser automation. Note: `extension` is only usable when the host
+  advertises it (companion Chrome extension installed and connected); desktop
+  hosts usually advertise `iab` only.
 - **`workflow-mm` skill (5th skill, now in `skills/`)**: a harness-agnostic
   contract workflow that wraps the contract-dispatch-accept skeleton into one
   skill for any agent tool: per-run model choice (session model / local

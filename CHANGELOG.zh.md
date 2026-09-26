@@ -33,6 +33,11 @@
   `permission-review`、`claim-check`、`entity-extract`、`intent-router`、
   `state-judge`，外加 `context-compaction`（其"每个工具调用两问"的循环已改走
   `decide_batch`）。
+- **浏览器环境声明（`docs/BROWSER-USE.zh.md`）**：browser-use skill 背后的三种
+  后端（`iab` 内嵌 / `extension` 桥接真实 Chrome / `cdp` 无头托管）、"可用性
+  以宿主广告为准"的纪律，以及与判定层浏览器动作打分的接线。契约涉及浏览器
+  自动化时由 workflow-mm 维度 4 引用。注意：`extension` 只有宿主广告时可用
+  （需装并连接配套 Chrome 扩展）；桌面宿主通常只广告 `iab`。
 - **`workflow-mm` skill（第 5 个 skill，入库 `skills/`）**：跨 harness 的泛用
   契约工作流，把"契约-派发-验收"骨架收敛为单个 skill，任何 agent 工具可用。
   每次运行可选模型（会话模型 / 本地 default 档 / 列出路由挑一档）；派发双
