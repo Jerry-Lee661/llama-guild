@@ -80,6 +80,41 @@ lets the local model drift off-contract unreviewed.
 | Economics & safety | **Context preflight** (exact tokenization on llama.cpp, heuristic elsewhere) with structured `context_exceeded` errors; VRAM pools; hard switch to remove the skills from agent context entirely |
 | Observability | `chat`/`complete` with TTFT & speculative-decode acceptance, per-token `logprobs` on `chat`; `bench` (speed / ttft / prefill / longctx); `usage_stats`, local-only |
 
+### The Jev decision layer
+
+Beyond execution dispatch, llama-guild ships a **judgment layer**: closed-set
+decisions (allow/ask/deny, keep/drop, entity pick, NLI entailment) go to a
+fine-tuned **System One engine** (QJev 3.5-0.8B, GGUF + LoRA, ~1 GB of VRAM)
+instead of the cloud model.
+
+- **Tools**: `decide` (one question), `decide_batch` (N questions over one
+  shared state in a single `/v1/systemone` round trip: the compaction path
+  asks the same two questions per tool call, and repeat rounds hit the TTL
+  cache), and `llama-decide-bench` (accuracy / per-family / ECE regression
+  over a labeled JSONL).
+- **Judgment skills**: `reflex-decide` routes decisions to the engine from the
+  agent side; `permission-review`, `claim-check`, `entity-extract`,
+  `intent-router`, `state-judge`, and `context-compaction` are concrete
+  judgment consumers built on it.
+- **Verified live** (2026-09-26, v14_s0 engine): the permissions threshold
+  policy reproduces all five reference commands (`rm -rf ~` deny, `git status`
+  allow, `curl | sh` deny, ...); browser-action scoring on four real
+  job-portal homepages (Liepin, Guopin, Nowcoder, Yingjiesheng) picked the
+  correct next action at 0.9985-0.9989 confidence in 165-569 ms per step; the
+  hardened adapter (v16a2) closes the forged-options-block gap from -47.7 pp
+  to +1.2 pp.
+
+### Coming: workflow-mm
+
+A **harness-agnostic contract workflow skill** (draft lives in
+`~/.agents/skills/workflow-mm`, ships with this repo's `setup` once stable):
+same contract-dispatch-accept skeleton as the skills above, but driven as one
+skill for any agent tool: model selection per run (session model, the local
+`default` profile, or picking from a listed route), dual dispatch (subagent
+when available, embedded local-executor otherwise), and a `workflow-state.md`
+file as the portable progress record, so a run can be resumed across
+sessions.
+
 ## Quick start
 
 > Prereqs: Python 3.10+, any supported agent tool, and either a running local

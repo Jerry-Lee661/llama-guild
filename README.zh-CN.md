@@ -69,6 +69,33 @@ VS Code、DSH、pi、omp、opencode。本地模型连不上时流程自动降级
 | 成本与防护 | 发送前检查上下文长度（llama.cpp 按 token 精确计算，其他后端估算），超限返回 `context_exceeded` 错误；显存按显卡分池管控；不想用这套流程时，一个脚本就能把 skill 整体关掉 |
 | 运行指标 | `chat`/`complete` 返回首字延迟和投机解码接受率，`chat` 还可返回逐 token 概率（logprobs）；`bench` 支持速度 / 首字延迟 / 预填充 / 长上下文四种测试；`usage_stats` 查看 token 用量，仅存本地 |
 
+## Jev 判定层
+
+除了执行派发，llama-guild 还有一层**判定层**：封闭集判定（放行/询问/拒绝、
+保留/丢弃、实体挑选、NLI 蕴含）交给微调过的 **System One 引擎**
+（QJev 3.5-0.8B，GGUF + LoRA，约 1GB 显存），不惊动云端模型。
+
+- **工具**：`decide`（单题）、`decide_batch`（同一 state 的多道题合成一次
+  `/v1/systemone` 往返，压缩场景每个工具调用两问，重复轮次走 TTL 缓存零网络）、
+  `llama-decide-bench`（对标注 JSONL 出准确率、分族成绩与 ECE 校准回归）。
+- **判定 skill**：`reflex-decide` 是入口规程，把判定类子任务路由给引擎；
+  `permission-review`、`claim-check`、`entity-extract`、`intent-router`、
+  `state-judge`、`context-compaction` 是建立在它上面的具体判定消费者。
+- **实测**（2026-09-26，v14_s0 引擎）：权限阈值策略在 5 条参考命令上全部给出
+  预期动作（`rm -rf ~` 拒、`git status` 放行、`curl | sh` 拒等）；对四个真实
+  招聘网站首页（猎聘、国聘、牛客、应届生）做浏览器动作打分，每步都选中正确
+  动作，置信度 0.9985-0.9989，单步 165-569ms；加固适配器（v16a2）把伪造选项
+  块攻击的掉分从 -47.7pp 收到 +1.2pp。
+
+## 计划中：workflow-mm
+
+一个**跨 harness 的泛用契约工作流 skill**（初稿在 `~/.agents/skills/workflow-mm`，
+稳定后随本仓库的 `setup` 分发）：与上述 skill 同一套"契约-派发-验收"骨架，
+但收敛为单个 skill，任何 agent 工具都能跑。每次运行可选模型（会话模型 /
+本地 default 档 / 列出路由挑一档）；派发双路径（宿主有子代理就每个任务包
+开子代理，没有就走主上下文内嵌的 local-executor 契约模式）；进度落盘
+`workflow-state.md`，中断后可跨会话续跑。
+
 ## 快速开始
 
 > 准备：Python 3.10+ 和任意一个支持的 agent 工具。本地后端有最好，没有也行，
