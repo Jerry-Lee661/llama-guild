@@ -60,7 +60,7 @@ magnitude cheaper, with tool-enforced acceptance so quality doesn't slip.
           full lifecycle               LM Studio · Ollama · vLLM · llama-swap
 ```
 
-Everything ships as **8 skills + 1 MCP server**, packaged for ZCode, Claude
+Everything ships as **6 skills + 1 MCP server**, packaged for ZCode, Claude
 Code, Codex, VS Code, DSH, pi, omp, and opencode. When local is unreachable the
 workflow degrades gracefully: the executor reports `LOCAL_MODEL_FAILED` or falls
 back to session mode; it never silently writes contract code itself, and never
@@ -95,7 +95,10 @@ instead of the cloud model.
 - **Judgment skills**: `reflex-decide` routes decisions to the engine from the
   agent side; `permission-review`, `claim-check`, `entity-extract`,
   `intent-router`, `state-judge`, and `context-compaction` are concrete
-  judgment consumers built on it.
+  judgment consumers built on it. **`reflex-use`** extends the same reflex to
+  use-agents: browser / desktop / Android action selection at 87-235 ms per
+  step, external assertions for completion
+  ([REFLEX-USE.zh.md](docs/REFLEX-USE.zh.md)).
 - **Verified live** (2026-09-26, v14_s0 engine): the permissions threshold
   policy reproduces all five reference commands (`rm -rf ~` deny, `git status`
   allow, `curl | sh` deny, ...); browser-action scoring on four real

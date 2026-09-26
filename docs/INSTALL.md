@@ -51,7 +51,7 @@ python mcp-server/tests/test_offline.py
 
 | 端 | Skills | 角色定义 | MCP 注册 | 路由派发 |
 |---|---|---|---|---|
-| ZCode | 5 个 SKILL.md → `~/.zcode/skills` | llama-router 插件 `local-executor` | `~/.zcode/cli/config.json` | 子agent 自动派发 |
+| ZCode | 6 个 SKILL.md → `~/.zcode/skills` | llama-router 插件 `local-executor` | `~/.zcode/cli/config.json` | 子agent 自动派发 |
 | Claude Code | → `~/.claude/skills` | `~/.claude/agents/local-executor.md` | `claude mcp add` | 子agent 自动派发 |
 | Codex | → `~/.agents/skills`（local-executor 为 skill 形态） | 无子agent 系统→编排者内嵌规程 | `~/.codex/config.toml` | prompt 内嵌派发 |
 | VS Code | 三个 `.agent.md` chat-mode（复制进目标仓库） | chat-mode 即角色 | `<repo>/.vscode/mcp.json` | chat-mode 手动/子agent |
@@ -129,7 +129,7 @@ powershell -File install\guild-switch.ps1 on       # 恢复
 ## pi (earendil-works/pi)
 
 - **Skills：零额外工作**。pi 按 Agent Skills 标准读取 `~/.agents/skills/`（安装器已覆盖）
-  与 `~/.pi/agent/skills/`，六个 SKILL.md 自动可见。
+  与 `~/.pi/agent/skills/`，七个 SKILL.md 自动可见。
 - **MCP：pi 官方无内置 MCP**，走社区扩展：
   ```bash
   pi install npm:pi-mcp-adapter

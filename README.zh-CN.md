@@ -51,7 +51,7 @@ English documentation: **[README.md](README.md)**
           完整生命周期管理              LM Studio · Ollama · vLLM · llama-swap
 ```
 
-以上内容打包成 **8 个 skill + 1 个 MCP server**，支持 ZCode、Claude Code、Codex、
+以上内容打包成 **6 个 skill + 1 个 MCP server**，支持 ZCode、Claude Code、Codex、
 VS Code、DSH、pi、omp、opencode。本地模型连不上时流程自动降级：执行者上报
 `LOCAL_MODEL_FAILED`，或改由当前会话直接处理；不会偷偷替本地模型写代码，
 也不会放过未经检查的产出。
@@ -78,7 +78,7 @@ VS Code、DSH、pi、omp、opencode。本地模型连不上时流程自动降级
 - **工具**：`decide`（单题）、`decide_batch`（同一 state 的多道题合成一次
   `/v1/systemone` 往返，压缩场景每个工具调用两问，重复轮次走 TTL 缓存零网络）、
   `llama-decide-bench`（对标注 JSONL 出准确率、分族成绩与 ECE 校准回归）。
-- **判定 skill**：`reflex-decide` 是入口规程，把判定类子任务路由给引擎；
+- **判定 skill**：`reflex-decide` 是入口规程，把判定类子任务路由给引擎；`reflex-use` 把同一反射扩展到 use 类 agent：浏览器/桌面/Android 的动作选择每步 87-235ms，完成判定交外部断言（[REFLEX-USE.zh.md](docs/REFLEX-USE.zh.md)）；
   `permission-review`、`claim-check`、`entity-extract`、`intent-router`、
   `state-judge`、`context-compaction` 是建立在它上面的具体判定消费者。
 - **实测**（2026-09-26，v14_s0 引擎）：权限阈值策略在 5 条参考命令上全部给出

@@ -33,6 +33,14 @@
   `permission-review`、`claim-check`、`entity-extract`、`intent-router`、
   `state-judge`，外加 `context-compaction`（其"每个工具调用两问"的循环已改走
   `decide_batch`）。
+- **`reflex-use` skill（第 6 个 skill）+ `docs/REFLEX-USE.zh.md`**：把已实测的
+  浏览器反射环泛化到 computer-use / browser-use / Android-use：宿主把可见
+  元素枚举成有界动作元组，QJev 引擎挑一个（每步 87-235ms），宿主执行，
+  外部断言判完成。桌面与 Android 词表格式级验证通过（记事本"另存为"选
+  文件菜单 0.9997/155ms；登录页字段已填选登录 0.9998/174ms）；抓到并记录
+  一个真实弱点：空表单上引擎直接点提交，修法是宿主护栏（必填字段非空前
+  submit 元组不下发），不重训。设备级闭环待宿主具备 Android SDK /
+  Computer Use 能力。
 - **浏览器环境声明（`docs/BROWSER-USE.zh.md`）**：browser-use skill 背后的三种
   后端（`iab` 内嵌 / `extension` 桥接真实 Chrome / `cdp` 无头托管）、"可用性
   以宿主广告为准"的纪律，以及与判定层浏览器动作打分的接线。契约涉及浏览器

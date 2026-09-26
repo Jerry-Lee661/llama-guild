@@ -63,6 +63,17 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   `entity-extract`, `intent-router`, `state-judge`, plus
   `context-compaction` (its two-questions-per-tool-call loop now rides
   `decide_batch`).
+- **`reflex-use` skill (6th skill) + `docs/REFLEX-USE.zh.md`**: generalize the
+  field-proven browser reflex loop to computer-use / browser-use /
+  Android-use: host enumerates visible elements into bounded action tuples,
+  the QJev engine picks one (87-235 ms per step), the host actuates, external
+  assertions decide completion. Format-level scoring verified for desktop
+  (Notation "save as PDF" -> File menu, 0.9997/155 ms) and Android (login
+  page, fields-filled -> login button, 0.9998/174 ms) vocabularies on v14_s0;
+  a real gap found and documented: on empty forms the engine jumps to the
+  submit button, so submit tuples stay gated until required fields are filled
+  (host guardrail, no retrain). Device-level loops need the host's Android
+  SDK / Computer Use capability.
 - **Browser environment declaration (`docs/BROWSER-USE.zh.md`)**: the three
   browser backends behind the browser-use skill (`iab` in-app / `extension`
   bridge to your real Chrome / `cdp` headless), availability-by-advertisement
