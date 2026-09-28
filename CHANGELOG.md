@@ -86,6 +86,22 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   browser automation. Note: `extension` is only usable when the host
   advertises it (companion Chrome extension installed and connected); desktop
   hosts usually advertise `iab` only.
+- **Render contract v2 (`sysone2`) + v18m adapter: production endpoint swapped
+  again (2026-09-28)**. The [QUESTION][OPTIONS][STATE] order left the swap
+  pass with 0/2270 prefix-cache hits (the identical state sits after the
+  divergent options); sysone2 ([STATE] first) hits 1754/2270 (77%), cutting
+  per-decision prefill 39% and a 10-question batch 76% (measured: swap pass
+  805 -> 386 ms on the local CPU stack). `decide`/`llama-decide-bench` gain a
+  `state_first` switch (profile `decide.render: "sysone2"`, CLI
+  `--state-first`; plain+state_first is rejected). Verified before the swap:
+  seed_ext2 30-row email 76.7% (within the +/-18 tolerance band of the GP
+  battery), the five reference permission commands 5/5, the forged-block
+  probe reproducing the GP numbers digit for digit (gap +0.0 pp, 2/86;
+  injection -2.3), and a cross-check that v18m rejects the OLD order as out
+  of distribution. 8280 now runs v18m_s0 + sysone2 (identity re-read, 5/5
+  regression on the product profile); rollback = v16a3_s1 adapter + drop the
+  render key. Known new signal, reported to the GP side: the probe's fewshot
+  condition collapses to all-deny on v18m (-72.1 pp).
 - **`workflow-mm` skill (5th skill, now in `skills/`)**: a harness-agnostic
   contract workflow that wraps the contract-dispatch-accept skeleton into one
   skill for any agent tool: per-run model choice (session model / local

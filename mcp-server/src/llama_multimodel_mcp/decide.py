@@ -85,14 +85,24 @@ def build_prompt(question: str, options: list[str], system: str | None = None) -
 
 
 def build_messages(question: str, options: list[str], state: str,
-                   system: str | None = None) -> list[dict]:
+                   system: str | None = None, state_first: bool = False) -> list[dict]:
     """Chat messages in the System One render contract (training/common.py).
 
-    Order matters: [QUESTION] -> [OPTIONS] -> [STATE]; the state comes last.
+    sysone1 (default): [QUESTION] -> [OPTIONS] -> [STATE]; the state comes last.
+    sysone2 (state_first=True): [STATE] -> [QUESTION] -> [OPTIONS]; the shared
+    state leads so the two swap passes and same-state batches hit the slot
+    prefix cache (measured 77% hit at 2270 tokens; 0% in sysone1 order).
+    The adapter and the render order must be switched as a pair: either
+    combination across the pair is out of distribution.
     """
     lines = [f"{LETTERS[i]}. {opt}" for i, opt in enumerate(options)]
-    user = (f"[QUESTION]\n{question}\n\n[OPTIONS]\n" + "\n".join(lines)
-            + f"\n\n[STATE]\n{state}")
+    opts_block = "\n".join(lines)
+    if state_first:
+        user = (f"[STATE]\n{state}\n\n[QUESTION]\n{question}\n\n[OPTIONS]\n"
+                + opts_block)
+    else:
+        user = (f"[QUESTION]\n{question}\n\n[OPTIONS]\n" + opts_block
+                + f"\n\n[STATE]\n{state}")
     return [{"role": "system", "content": system or SYSONE_SYSTEM},
             {"role": "user", "content": user}]
 
@@ -176,9 +186,10 @@ _CACHE_TTL = float(os.environ.get("LLAMA_MM_DECIDE_TTL", "300"))   # seconds; 0 
 
 
 def cache_key(base, question: str, options: list[str], state: str | None, fmt: str,
-              model: str | None, primitive: str) -> tuple:
+              model: str | None, primitive: str, state_first: bool = False) -> tuple:
     return (str(base), model or "", fmt, primitive, question,
-            tuple(options), hashlib.sha256((state or "").encode("utf-8")).hexdigest())
+            tuple(options), hashlib.sha256((state or "").encode("utf-8")).hexdigest(),
+            bool(state_first))
 
 
 def cache_get(key: tuple) -> dict | None:
@@ -297,11 +308,12 @@ def _one_pass(base, question: str, options: list[str], system: str | None,
 
 def _one_pass_chat(base, question: str, options: list[str], state: str,
                    system: str | None, top_logprobs: int, timeout: float,
-                   model: str | None = None) -> tuple[dict[str, float], list[str]]:
+                   model: str | None = None,
+                   state_first: bool = False) -> tuple[dict[str, float], list[str]]:
     """One sysone pass through /v1/chat/completions (chat template + logprobs)."""
     k = len(options)
     body: dict = {
-        "messages": build_messages(question, options, state, system),
+        "messages": build_messages(question, options, state, system, state_first),
         "max_tokens": 1,
         "temperature": 0.0,
         "logprobs": True,
@@ -320,7 +332,7 @@ def run_decide(base, question: str, options: list[str], primitive: str = "choice
                timeout: float = 120.0, model: str | None = None,
                state: str | None = None, fmt: str = "plain",
                policy: dict | None = None, profile_id: str | None = None,
-               cache: bool = True) -> dict:
+               cache: bool = True, state_first: bool | None = None) -> dict:
     if primitive == "noul" and len(options) == 2:
         pass
     validate_options(options, primitive)
@@ -328,7 +340,15 @@ def run_decide(base, question: str, options: list[str], primitive: str = "choice
         raise ValueError(f"未知 format '{fmt}'（可用: {', '.join(FORMATS)}）")
     if fmt == "sysone" and state is None:
         raise ValueError("format=sysone 需要 state（[STATE] 是训练契约的一部分）")
-    key = cache_key(base, question, options, state, fmt, model, primitive)
+    # render order: explicit argument wins, else the profile's decide.render
+    # ("sysone2" -> state first). Adapter and render must switch as a pair.
+    if state_first is None:
+        state_first = str((policy or {}).get("render") or "").lower() == "sysone2"
+    if state_first and fmt != "sysone":
+        raise ValueError("state_first/render=sysone2 只对 format=sysone 有意义"
+                         "（plain 是另一条 GBNF 渲染路径，无 [STATE] 段可前置）")
+    key = cache_key(base, question, options, state, fmt, model, primitive,
+                    state_first=state_first)
     if cache:
         hit = cache_get(key)
         if hit is not None:
@@ -345,11 +365,11 @@ def run_decide(base, question: str, options: list[str], primitive: str = "choice
     degraded_reason: str | None = None
     if fmt == "sysone":
         pass1, missing = _one_pass_chat(base, question, options, state or "", system,
-                                        n_probs, timeout, model)
+                                        n_probs, timeout, model, state_first)
         pass2 = None
         try:
             rev, _ = _one_pass_chat(base, question, list(reversed(options)), state or "",
-                                    system, n_probs, timeout, model)
+                                    system, n_probs, timeout, model, state_first)
             pass2 = rev
         except (llama_client.LlamaHTTPError, ValueError) as e:
             degraded_reason = f"single_pass: 第二遍失败（{e}）"
@@ -382,7 +402,7 @@ def run_decide(base, question: str, options: list[str], primitive: str = "choice
         "pass_choices": [p1_choice] + ([best_option(pass2, list(reversed(options)))]
                                        if pass2 else []),
         "swapped": pass2 is not None,
-        "format": fmt,
+        "format": ("sysone2" if (fmt == "sysone" and state_first) else fmt),
         "latency_ms": round((time.perf_counter() - t0) * 1000),
     }
     if missing:
@@ -561,6 +581,10 @@ def main() -> None:
     ap.add_argument("--n-probs", type=int, default=None)
     ap.add_argument("--top-logprobs", type=int, default=20)
     ap.add_argument("--timeout", type=float, default=120.0)
+    ap.add_argument("--state-first", action="store_true",
+                    help="sysone2 render: [STATE] before [QUESTION]/[OPTIONS] "
+                         "(pairs only with adapters trained on the sysone2 order; "
+                         "profile decide.render=sysone2 sets this too)")
     ap.add_argument("--no-audit", action="store_true")
     args = ap.parse_args()
 
@@ -604,6 +628,8 @@ def main() -> None:
         base = args.url.rstrip("/")
     else:
         base = args.port
+    if args.state_first and not fmt:
+        fmt = "sysone"          # --state-first implies the sysone contract
     fmt = fmt or "plain"
     if args.no_audit:
         policy = {**(policy or {}), "audit": False}
@@ -612,7 +638,7 @@ def main() -> None:
                             primitive=args.primitive, system=system,
                             n_probs=args.n_probs or args.top_logprobs, timeout=args.timeout,
                             model=model, state=state, fmt=fmt, policy=policy,
-                            profile_id=profile_id)
+                            profile_id=profile_id, state_first=(True if args.state_first else None))
     except (ValueError, llama_client.LlamaHTTPError) as e:
         # a hook needs a safe default, not a stack trace: fall back to fail_mode when set
         fail = (policy or {}).get("fail_mode")
@@ -629,7 +655,8 @@ def main() -> None:
 def bench_rows(data: str, profile_id: str | None = None, port: int | None = None,
                url: str | None = None,
                limit: int = 0, family: str | None = None, distractor: bool = False,
-               fmt: str | None = None, timeout: float = 120.0, quiet: bool = False) -> dict:
+               fmt: str | None = None, timeout: float = 120.0, quiet: bool = False,
+               state_first: bool = False) -> dict:
     """Accuracy + calibration of the reflex over a labeled JSONL (one decision per row).
 
     Row schema (the same one the training pipeline emits):
@@ -671,7 +698,7 @@ def bench_rows(data: str, profile_id: str | None = None, port: int | None = None
             try:
                 out = run_decide(base, rec["instructions"], options, fmt=fmt,
                                  state=rec["state"], model=model, policy=policy,
-                                 profile_id=profile_id, timeout=timeout)
+                                 profile_id=profile_id, timeout=timeout, state_first=state_first)
             except (ValueError, llama_client.LlamaHTTPError) as e:
                 out = {"choice_name": None, "confidence": 0.0, "error": str(e)[:200]}
             n += 1
@@ -719,6 +746,8 @@ def main_bench() -> None:
     ap.add_argument("--family", help="only this family")
     ap.add_argument("--distractor", action="store_true",
                     help="append an irrelevant option to every row (robustness check)")
+    ap.add_argument("--state-first", action="store_true",
+                    help="sysone2 render (pairs only with sysone2-trained adapters)")
     ap.add_argument("--format", default=None, choices=FORMATS)
     ap.add_argument("--timeout", type=float, default=120.0)
     ap.add_argument("--quiet", action="store_true")
@@ -729,7 +758,8 @@ def main_bench() -> None:
                              url=args.url,
                              limit=args.limit, family=args.family,
                              distractor=args.distractor, fmt=args.format,
-                             timeout=args.timeout, quiet=args.quiet)
+                             timeout=args.timeout, quiet=args.quiet,
+                             state_first=args.state_first)
     except (ValueError, llama_client.LlamaHTTPError, OSError) as e:
         print(json.dumps({"error": str(e)}, ensure_ascii=False))
         sys.exit(1)

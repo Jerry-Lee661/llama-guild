@@ -492,7 +492,8 @@ def decide(profile_id: str | None = None, port: int | None = None,
         return decide_mod.run_decide(base, question, list(options), primitive=primitive,
                                      system=system, n_probs=n_probs,
                                      timeout=timeout_seconds, model=model, state=state,
-                                     fmt=fmt, policy=policy, profile_id=profile_id)
+                                     fmt=fmt, policy=policy, profile_id=profile_id,
+                                     state_first=(policy or {}).get("render") == "sysone2")
     except (ValueError, llama_client.LlamaHTTPError) as e:
         fail = (policy or {}).get("fail_mode")
         if not fail:

@@ -578,12 +578,6 @@ def test_decide_cache_key_and_ttl():
         d._CACHE_TTL = old
 
 
-if __name__ == "__main__":
-    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    for fn in fns:
-        fn()
-        print(f"PASS {fn.__name__}")
-    print(f"{len(fns)} tests passed")
 
 
 def test_decide_batch_payload_policy_and_cache():
@@ -602,9 +596,10 @@ def test_decide_batch_payload_policy_and_cache():
            "labels_verified": True}
 
     real_request, real_ttl = d.llama_client.request, d._CACHE_TTL
-    cache_snapshot = dict(d._CACHE)
+    cache_snapshot = list(d._CACHE.items())
+    d._CACHE.clear()
     d.llama_client.request = fake_request
-    d._CACHE_TTL, d._CACHE = 300, {}
+    d._CACHE_TTL = 300
     qs = [{"id": "q1", "question": "Allow this tool call?",
            "options": ["ask: side effects", "allow: read-only", "deny: destructive"]},
           {"id": "q2", "question": "Is the statement true?",
@@ -614,7 +609,8 @@ def test_decide_batch_payload_policy_and_cache():
                                  policy={"min_confidence": 0.5, "fail_mode": "ask"},
                                  profile_id="t")
     finally:
-        d.llama_client.request, d._CACHE_TTL, d._CACHE = real_request, real_ttl, cache_snapshot
+        # round 2 needs round 1's cache entries: restore request/TTL only here
+        d.llama_client.request, d._CACHE_TTL = real_request, real_ttl
 
     # one round trip, sysone path, criteria rendered as the name->desc map
     assert captured["path"] == "/v1/systemone"
@@ -633,12 +629,13 @@ def test_decide_batch_payload_policy_and_cache():
     def no_network(*a, **kw):
         raise AssertionError("network hit on cache-only round")
     d.llama_client.request = no_network
-    d._CACHE_TTL, d._CACHE = 300, dict(d._CACHE)
+    d._CACHE_TTL = 300
     try:
         out2 = d.run_decide_batch("http://127.0.0.1:8301", "Tool call: `rm -rf ~`", qs,
                                   policy={"min_confidence": 0.5, "fail_mode": "ask"})
     finally:
-        d.llama_client.request, d._CACHE_TTL, d._CACHE = real_request, real_ttl, cache_snapshot
+        d.llama_client.request, d._CACHE_TTL = real_request, real_ttl
+        d._CACHE.clear(); d._CACHE.update(cache_snapshot)
     assert out2["answers"]["q1"]["cached"] is True
     assert out2["answers"]["q2"]["cached"] is True
 
@@ -673,3 +670,63 @@ def test_decide_batch_validation_and_errors():
         d.llama_client.request = real
     assert out["answers"]["q1"]["action"] == "ask"
     assert "error" in out["answers"]["q1"]
+
+
+def test_sysone2_state_first_render():
+    from llama_multimodel_mcp.decide import build_messages, run_decide
+    # sysone1 (default): QUESTION -> OPTIONS -> STATE
+    m1 = build_messages("q?", ["a: x", "b: y"], "the state")
+    assert m1[1]["content"].startswith("[QUESTION]")
+    assert m1[1]["content"].endswith("[STATE]\nthe state")
+    # sysone2: STATE -> QUESTION -> OPTIONS
+    m2 = build_messages("q?", ["a: x", "b: y"], "the state", state_first=True)
+    assert m2[1]["content"].startswith("[STATE]\nthe state")
+    assert "[QUESTION]\nq?" in m2[1]["content"]
+    assert m2[1]["content"].rstrip().endswith("B. b: y")
+    # system prompt unchanged in both orders
+    assert m1[0]["content"] == m2[0]["content"]
+    # profile decide.render="sysone2" maps to state_first without an explicit arg
+    calls = {}
+    def fake_chat(base, q, opts, st, sysm, npr, to, mo, sf=False):
+        calls["state_first"] = sf
+        return {"A": 0.6, "B": 0.4}, []
+    real = run_decide.__globals__["_one_pass_chat"]
+    run_decide.__globals__["_one_pass_chat"] = fake_chat
+    real_ttl, snap = run_decide.__globals__["_CACHE_TTL"], list(run_decide.__globals__["_CACHE"].items())
+    run_decide.__globals__["_CACHE_TTL"] = 0
+    run_decide.__globals__["_CACHE"].clear()
+    try:
+        run_decide("http://x", "q?", ["a: x", "b: y"], state="s", fmt="sysone",
+                   policy={"render": "sysone2"})
+        assert calls["state_first"] is True
+        run_decide("http://x", "q?", ["a: x", "b: y"], state="s", fmt="sysone",
+                   policy={"min_confidence": 0.5})
+        assert calls["state_first"] is False
+        # cache keys differ across render orders (different contracts)
+        from llama_multimodel_mcp.decide import cache_key
+        assert cache_key("http://x", "q", ["a"], "s", "sysone", None, "choice",
+                         state_first=True) != \
+               cache_key("http://x", "q", ["a"], "s", "sysone", None, "choice",
+                         state_first=False)
+    finally:
+        run_decide.__globals__["_one_pass_chat"] = real
+        run_decide.__globals__["_CACHE_TTL"] = real_ttl
+        run_decide.__globals__["_CACHE"].clear(); run_decide.__globals__["_CACHE"].update(snap)
+
+
+if __name__ == "__main__":
+    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    for fn in fns:
+        fn()
+        print(f"PASS {fn.__name__}")
+    print(f"{len(fns)} tests passed")
+
+
+def test_state_first_requires_sysone():
+    from llama_multimodel_mcp.decide import run_decide
+    try:
+        run_decide("http://x", "q?", ["a: x", "b: y"], state="s", fmt="plain",
+                   state_first=True)
+        assert False, "state_first with plain must raise"
+    except ValueError as e:
+        assert "sysone" in str(e)

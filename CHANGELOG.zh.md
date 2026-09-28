@@ -43,6 +43,18 @@
   一个真实弱点：空表单上引擎直接点提交，修法是宿主护栏（必填字段非空前
   submit 元组不下发），不重训。设备级闭环待宿主具备 Android SDK /
   Computer Use 能力。
+- **渲染契约 v2（sysone2）+ v18m 适配器：产品端点再次切换（2026-09-28）**。
+  旧序 [QUESTION][OPTIONS][STATE] 下两遍交换的 prefix cache 命中为 0/2270
+  （相同的 state 排在分叉的选项之后）；sysone2（state 前置）命中 1754/2270
+  （77%），单次判定预填充省 39%、十题批量省 76%（实测：swap 第二遍 805ms →
+  386ms，本机 CPU 栈）。`decide` / `llama-decide-bench` 增加 `state_first`
+  开关（profile 配 `decide.render: "sysone2"`，CLI 加 `--state-first`；
+  plain 与 state_first 组合直接拒绝）。切换前验证：seed_ext2 30 行 email
+  76.7%（GP 电池 ±18 容差带内）、权限 5 条参考命令 5/5、伪造探针逐位复现
+  GP 数字（gap +0.0pp，2/86；injection -2.3）、并交叉确认 v18m 对旧序呈
+  分布外。8280 现运行 v18m_s0 + sysone2（身份回读、产品档 5/5 回归）；
+  回滚 = 换回 v16a3_s1 adapter 并删除 render 字段。新信号已报告 GP 侧：
+  探针的 fewshot 条件在 v18m 上塌缩为全 deny（-72.1pp）。
 - **浏览器环境声明（`docs/BROWSER-USE.zh.md`）**：browser-use skill 背后的三种
   后端（`iab` 内嵌 / `extension` 桥接真实 Chrome / `cdp` 无头托管）、"可用性
   以宿主广告为准"的纪律，以及与判定层浏览器动作打分的接线。契约涉及浏览器

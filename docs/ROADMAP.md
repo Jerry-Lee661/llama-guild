@@ -69,12 +69,12 @@ slot 占死已由 parallel=2 解决（2026-09-18 复核 /models：--parallel 2 �
 > 同一 state 的 N 题合成一次 `/v1/systemone` 往返，接 GP 侧
 > `training/sysone_endpoint.py`（QJev v14_s0 实栈验证）；逐题策略本地应用，
 > TTL 缓存让 compaction 重复轮次零网络。
-> 排队（2026-09-27 设计定稿，GP 侧 `docs/notes/2026-09-27-render-order-prefix-cache.md`）：
-> 渲染序改 `[STATE][QUESTION][OPTIONS]` 换前缀缓存对齐——实测现行序 swap 第二遍
-> 命中 0/2270，state-first 命中 1754/2270（77%）；单判定省 39% 预填充、十题批量
-> 省 76%，CPU 部署与 compaction 批量是主要受益。格式即契约，需重训（续训臂先行）
-> + 电池/伪造探针/阈值全量重验；渲染函数 GP common.py 与 decide.py 同步切、
-> 版本标记 sysone2 并存，过门后切 8280。
+> 已落地（2026-09-28）：GP 侧训练出 v18m_s0（sysone2 序续训 + ToolACE 2,400 行 +
+> banking77 删除），llama-guild decide/bench 加 `state_first` 开关（profile
+> `decide.render: "sysone2"`），验证序列（30 行同分布、5 条命令、伪造探针逐位
+> 复现 gap +0.0、前缀缓存 77% 命中 / swap 第二遍 -52%）全过后 8280 已切
+> v18m + sysone2；回滚 = v16a3_s1 + 删 render 字段。原设计：
+> GP 侧 `docs/notes/2026-09-27-render-order-prefix-cache.md`。
 
 ## v0.3+（待触发立项）
 
