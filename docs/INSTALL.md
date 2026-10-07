@@ -173,6 +173,23 @@ powershell -File install\guild-switch.ps1 on       # 恢复
 见 [dsh/README.md](../dsh/README.md)。要点：
 `dsh web --patch dsh/cordis.patch.yml`（一行接入 MCP），presets 提供 planner/executor persona。
 
+## 判定层（decide 家族）/ Decision layer
+
+判定类封闭问题（权限放行/询问/拒绝、NLI 蕴含、压缩取舍）可交给本地 0.8B 判定引擎
+（llama.cpp + LoRA，约 1GB 显存），配套示例档 `qjev35-judgment`（见
+`profiles.example.json`）：
+
+- `decide` / `llama-decide`：单题判定；判定引擎（QJev 系）必须 `format=sysone`
+  且选项带 `"name: desc"` 描述（只给名字会翻转判定）。
+- `decide_batch` / `llama-decide-batch`：同一 state 多题一次往返；**同批题目必须
+  相互独立**，依赖前一问答案的题拆到下一轮。需要 System One schema 端点
+  （GP 侧 `training/sysone_endpoint.py`）。
+- `decide.render: "sysone2"`：state 前置渲染序。adapter 与渲染序**成对切换**：
+  sysone2 训练的 adapter 才能设 `"sysone2"`；老 adapter（v14/v16 系）保持旧序
+  （删掉 render 字段）。切错组合 = 分布外。
+- 阈值与失败语义：`min_confidence` + `fail_mode`（默认 ask；NLI 档 no）+
+  `rules`（deny≥0.30 / allow≥0.60）。
+
 ## 故障排查
 
 - 工具没出现：确认新开会话；ZCode 用 diagnosing-skills / diagnosing-mcp 排查

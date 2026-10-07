@@ -506,7 +506,11 @@ def decide(profile_id: str | None = None, port: int | None = None,
 def decide_batch(profile_id: str | None = None, port: int | None = None,
                  state: str = "", questions: list[dict] | None = None,
                  timeout_seconds: float = 300.0) -> dict:
-    """批量判定：同一 state 的多道判定题合成一次 /v1/systemone 往返（仅 System One schema 端点支持，如 training/sysone_endpoint.py 起的 8301；llama.cpp 原生端点无此路径）。questions: [{id?, question, options:["name: desc",...], primitive?}]。端点侧完成两遍顺序交换平均，本地按 profile 的 decide 策略（rules/min_confidence/fail_mode）给每题 action；每题先查 TTL 缓存，compaction 的"每次 tool call 两问"重复轮次零网络开销。"""
+    """批量判定：同一 state 的多道判定题合成一次 /v1/systemone 往返（仅 System One schema 端点支持，如 training/sysone_endpoint.py 起的 9431；llama.cpp 原生端点无此路径）。questions: [{id?, question, options:["name: desc",...], primitive?}]。批量契约限制：同批题目必须相互独立——依赖前一问答案或在批内互看的题要拆到下一轮（端点并行处理，批内互不可见）。端点侧完成两遍顺序交换平均，本地按 profile 的 decide 策略（rules/min_confidence/fail_mode/rule/render）给每题 action；每题先查 TTL 缓存，compaction 的"每次 tool call 两问"重复轮次零网络开销。渲染序按 profile 的 decide.render（"sysone2"=state 前置），与批端点的 SYSONE_STATE_FIRST 必须成对配置。"""
+    if not state or not questions:
+        raise ValueError("需要 state 与 questions")
+    base, p = _target(profile_id, port)
+    policy = dict(p.decide or {}) if p is not None else None
     if not state or not questions:
         raise ValueError("需要 state 与 questions")
     base, p = _target(profile_id, port)
@@ -515,7 +519,8 @@ def decide_batch(profile_id: str | None = None, port: int | None = None,
     try:
         return decide_mod.run_decide_batch(base, state, [dict(q) for q in questions],
                                            model=model, timeout=timeout_seconds,
-                                           policy=policy, profile_id=profile_id)
+                                           policy=policy, profile_id=profile_id,
+                                           state_first=(policy or {}).get("render") == "sysone2")
     except (ValueError, llama_client.LlamaHTTPError) as e:
         fail = (policy or {}).get("fail_mode")
         if not fail:

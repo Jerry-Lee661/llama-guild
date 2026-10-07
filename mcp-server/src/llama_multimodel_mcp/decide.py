@@ -460,11 +460,18 @@ def _normalize_answer(ans: dict, primitive: str) -> tuple[str | None, dict[str, 
 
 def run_decide_batch(base, state: str, questions: list[dict], model: str | None = None,
                      timeout: float = 300.0, policy: dict | None = None,
-                     profile_id: str | None = None) -> dict:
+                     profile_id: str | None = None,
+                     state_first: bool | None = None) -> dict:
     """N questions over one shared state in a single /v1/systemone round trip.
 
     questions: [{"id"?: str, "question": str, "options": ["name: desc", ...],
                  "primitive"?: choice|noul|score}]
+
+    Batch contract limits (sysone2 migration guide §3.5): all questions in one
+    batch are INDEPENDENT — questions that depend on an earlier answer, or on
+    other questions in the request, must be dispatched in a later round: the
+    endpoint renders all questions against the same state and parallelizes
+    them, so nothing in a batch can see another question's result.
 
     Requires a System One schema endpoint (training/sysone_endpoint.py) — plain
     llama.cpp has no /v1/systemone. The endpoint does the two-pass swap-averaging
@@ -472,6 +479,9 @@ def run_decide_batch(base, state: str, questions: list[dict], model: str | None 
     applied here on the returned distributions. Each question consults the
     single-question TTL cache first (the compaction path repeats identical
     state+question pairs), so repeat rounds cost zero network requests.
+    state_first follows the profile's decide.render ("sysone2"), matching the
+    endpoint's SYSONE_STATE_FIRST — the adapter/render pair rule applies to
+    batches too, and the render order is part of the cache key.
     """
     if not state:
         raise ValueError("批量判定需要共享 state（[STATE] 是 sysone 契约的一部分）")
@@ -479,6 +489,12 @@ def run_decide_batch(base, state: str, questions: list[dict], model: str | None 
         raise ValueError("questions 不能为空")
     ids: list[tuple[str, dict, list[str], str, tuple]] = []
     payload_questions: dict[str, dict] = {}
+    if state_first is None:
+        state_first = str((policy or {}).get("render") or "").lower() == "sysone2"
+    # notes: the GP endpoint reads rendering order from ITS SYSONE_STATE_FIRST env;
+    # this flag only keeps cache keys and the recorded format faithful to what the
+    # caller asked for (the endpoint-side value is the deployment's responsibility).
+    sf_key = bool(state_first)
     for i, q in enumerate(questions):
         qid = str(q.get("id") or f"q{i + 1}")
         if qid in payload_questions:
@@ -492,8 +508,9 @@ def run_decide_batch(base, state: str, questions: list[dict], model: str | None 
             "criteria": _criteria_map(opts),
         }
         key = cache_key(str(base), str(q.get("question") or ""), opts, state,
-                        "sysone", model, primitive)
+                        "sysone", model, primitive, state_first=sf_key)
         ids.append((qid, q, opts, primitive, key))
+
 
     t0 = time.perf_counter()
     answers_out: dict[str, dict] = {}
@@ -552,6 +569,7 @@ def run_decide_batch(base, state: str, questions: list[dict], model: str | None 
                     {"action": fail, "low_confidence": True} if fail else {})}
     return {
         "batch_id": batch_id, "n_questions": len(ids),
+        "format": ("sysone2" if sf_key else "sysone"),
         "answers": {qid: answers_out.get(qid) or out_answers.get(qid) for qid, *_ in ids},
         "usage": {k: usage.get(k) for k in ("input_tokens", "output_tokens", "cached_tokens")},
         "labels_verified": labels_verified,
@@ -656,7 +674,7 @@ def bench_rows(data: str, profile_id: str | None = None, port: int | None = None
                url: str | None = None,
                limit: int = 0, family: str | None = None, distractor: bool = False,
                fmt: str | None = None, timeout: float = 120.0, quiet: bool = False,
-               state_first: bool = False) -> dict:
+               state_first: bool | None = None) -> dict:
     """Accuracy + calibration of the reflex over a labeled JSONL (one decision per row).
 
     Row schema (the same one the training pipeline emits):
@@ -759,7 +777,7 @@ def main_bench() -> None:
                              limit=args.limit, family=args.family,
                              distractor=args.distractor, fmt=args.format,
                              timeout=args.timeout, quiet=args.quiet,
-                             state_first=args.state_first)
+                             state_first=(True if args.state_first else None))
     except (ValueError, llama_client.LlamaHTTPError, OSError) as e:
         print(json.dumps({"error": str(e)}, ensure_ascii=False))
         sys.exit(1)

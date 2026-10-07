@@ -37,6 +37,14 @@
   按题扇出，cache-reuse 开启后 decide_batch 天然享受首条预热效应。请求粒度下
   等效性、确定性、反注入按构造成立，打包前向路径只作为实验特性保留。
   文档：[REFLEX-USE.zh.md](docs/REFLEX-USE.zh.md)（并发槽位一节）。
+- **decide_batch 补批量契约披露**（sysone2 迁移复核回填）：工具 schema 与
+  `run_decide_batch` 明确"同批题目必须相互独立，依赖前一问答案的题拆到下一轮"；
+  批量路径带上渲染序（profile `decide.render: "sysone2"`），入 cache key 与
+  返回 format；`llama-decide-bench --state-first` 改三态语义，不再覆盖 profile
+  推导（与早前的 llama-decide 修复同尾）。`profiles.example.json` 新增
+  `qjev35-judgment` 示例档：完整 `decide` 块（format / min_confidence /
+  fail_mode / rules / render: sysone2）与 adapter-渲染序成对切换说明；
+  INSTALL.md 增补判定层一节（格式契约、批量限制、配对规则、阈值）。
 - **真实网站浏览器动作打分验证**：按 `local-browser-use` 姿态（宿主把可交互
   元素枚举成有界动作元组，模型永不写选择器），v14_s0 在四个真实招聘网站首页
   （猎聘、国聘、牛客、应届生）每步都选中正确动作，置信度 0.9985-0.9989，

@@ -131,6 +131,18 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   construction at request granularity, so the packed-forward path ships as
   an experimental feature only.
   Docs: [REFLEX-USE.zh.md](docs/REFLEX-USE.zh.md) (concurrent-slot section).
+- **Batch-contract limits surfaced on decide_batch** (backfill from the sysone2
+  migration review): the tool schema and `run_decide_batch` now state that all
+  questions in one batch must be independent — answer-dependent questions go
+  to a later round; `decide_batch` also carries the render order (profile
+  `decide.render: "sysone2"`) in its cache key and recorded format, and
+  `llama-decide-bench --state-first` no longer overrides the profile key
+  (bi-state -> tri-state; `llama-decide` fixed earlier, same semantics).
+  `profiles.example.json` gains a `qjev35-judgment` example tier showing the
+  full `decide` block (format / min_confidence / fail_mode / rules /
+  render: sysone2) with the adapter-render pairing rule documented;
+  INSTALL.md gains a decision-layer section (format contract, batch limits,
+  render pairing, thresholds).
 - **`workflow-mm` skill (5th skill, now in `skills/`)**: a harness-agnostic
   contract workflow that wraps the contract-dispatch-accept skeleton into one
   skill for any agent tool: per-run model choice (session model / local

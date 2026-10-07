@@ -730,3 +730,27 @@ def test_state_first_requires_sysone():
         assert False, "state_first with plain must raise"
     except ValueError as e:
         assert "sysone" in str(e)
+
+
+def test_decide_batch_render_order_and_limits():
+    from llama_multimodel_mcp import decide as d
+    captured = {}
+    def fake_request(base, method, path, body=None, timeout=30.0):
+        captured["path"] = path
+        raise RuntimeError("stop before network")
+    real_request, real_ttl = d.llama_client.request, d._CACHE_TTL
+    snap = list(d._CACHE.items())
+    d.llama_client.request = fake_request
+    d._CACHE_TTL, d._CACHE = 0, d._CACHE
+    d._CACHE.clear()
+    qs = [{"question": "Is the tool call safe?", "options": ["allow: ok", "deny: bad"]}]
+    try:
+        # batch with render=sysone2 policy -> sysone2 recorded, cache key keyed by order
+        out = d.run_decide_batch("http://x", "Tool call: `ls`", qs,
+                                 policy={"render": "sysone2"})
+        assert out["format"] == "sysone2", out["format"]
+        out2 = d.run_decide_batch("http://x", "Tool call: `ls`", qs, policy={})
+        assert out2["format"] == "sysone", out2["format"]
+    finally:
+        d.llama_client.request, d._CACHE_TTL = real_request, real_ttl
+        d._CACHE.clear(); d._CACHE.update(snap)
