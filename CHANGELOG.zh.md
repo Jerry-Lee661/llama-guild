@@ -93,6 +93,20 @@
 > 单题 165-569ms。**校准警示仍然有效：概率未经校准，只作排序参考，调用方用
 > `pass_choices` / `agree` 字段把关。**
 
+### 新增：mcp-server（判定与可观测）
+
+- **`decide` MCP 工具 + `llama-decide` CLI**（第 20 个工具）：Jev 式原子判定——
+  GBNF 单 token 字母 grammar 约束解码，各选项概率取自
+  `completion_probabilities` 并在 K 个字母内重归一化（grammar 掩码保持比例），
+  两遍选项顺序交换取平均以消除位置偏置，置信度用 Jev 公式
+  `c=(pmax−1/K)/(1−1/K)`。原语：`choice` / `noul` / `score`。输出带
+  `pass_choices` + `agree`，调用方可据此把关收敛性；字母被埋时 `n_probs`
+  自动升级到 256 重试一次。CLI 供无法运行 MCP 的消费方（hook）使用，
+  stdout 输出 JSON。
+- `chat` 新增 `logprobs` / `top_logprobs`（OpenAI 兼容字段）；流式 chunk
+  解析抽成纯函数 `_consume_chunk`（可单测）。
+- `complete` 现在按需返回 `completion_probabilities`。
+
 ### 新增：mcp-server（租约账本）
 
 - **`lease_acquire` / `lease_renew` / `lease_release` / `lease_list` MCP
@@ -107,6 +121,22 @@
   `chat` / `complete` / `bench` 命中本会话自己的租约时顺带续期（工具调用
   续约，无后台心跳）。CLI 脚本直接 import 本模块，给长 TTL（如 14400s）
   并以自身进程作持有者。
+
+### 修复：数据与语义
+
+- **`remote_host` profile 键现被解析**（`host` 的别名）：三个用 `remote_host`
+  书写的 x99 档位此前静默指向 `http://127.0.0.1:8080` 而非局域网 router
+  （`x99-orn-262k` / `x99-tiel-q6-n4` / `x99-tiel-q6-512k`）；运行时
+  profiles.json 已规范化为 `host`。
+- **`server_status.profile_ports` 每端口改为列表**：旧赋值式在多档共享同一
+  端口时只保留最后一个（x99 router 在 8080 上挂了 7 个档位）。条目为
+  `{profile, tier, model}`。
+- **无固定 model 的 router 档显式解析**：host 档无 model 时 `chat` 查询
+  `GET /models`——恰好一个 loaded 则自动使用（绝不触发 autoload）；0 个或
+  多个 loaded 时报可操作错误并列出各模型状态。
+- `router_models` docstring 补充 `sleeping` 状态说明：llama.cpp router
+  （b545-c479922）经 `/models` 原生上报该状态（已实测），无需客户端翻译——
+  早前"sleeping 被显示为 loaded"的结论有误。
 
 ### 修复：显存记账盲区
 
