@@ -27,6 +27,16 @@
   下限与 gap 必须同时看。产品端点（X99:8280）已于 2026-09-27 热重启切到
   v16a3_s1 并就地复验：plain 89.5%、gap +3.5pp（3/86），合取验收通过；探针
   从此作为每次换引擎的回归门。
+- **判定层高吞吐服务：`--cache-reuse` 是跨槽前缀复用的确定性开关**（GP 侧并行
+  实验，X99，0.8B Q8，parallel 8 + kv-unified）。不开它，同 state 请求在每个
+  槽位全量预填充；开 `--kv-unified --cache-reuse 64` 后首条全量预填充
+  （~1,979 token，CPU 9.0s），后续同 state 请求只处理 ~500 token（省 74%，
+  服务端 KV 保持率 0.977），每题 2.4s。`--kv-unified` 必须：不加时 `-c` 被切成
+  每槽份额，长 state 直接爆上下文。服务配方排队到 8280 下次换引擎窗口：
+  `--parallel 8 --kv-unified --cache-reuse 64`；dispatcher 模式 = state 预热 +
+  按题扇出，cache-reuse 开启后 decide_batch 天然享受首条预热效应。请求粒度下
+  等效性、确定性、反注入按构造成立，打包前向路径只作为实验特性保留。
+  文档：[REFLEX-USE.zh.md](docs/REFLEX-USE.zh.md)（并发槽位一节）。
 - **真实网站浏览器动作打分验证**：按 `local-browser-use` 姿态（宿主把可交互
   元素枚举成有界动作元组，模型永不写选择器），v14_s0 在四个真实招聘网站首页
   （猎聘、国聘、牛客、应届生）每步都选中正确动作，置信度 0.9985-0.9989，
@@ -74,6 +84,46 @@
 > `cat ~/.ssh/id_ed25519` 拒、`npm install express` 询问），两遍交换全一致，
 > 单题 165-569ms。**校准警示仍然有效：概率未经校准，只作排序参考，调用方用
 > `pass_choices` / `agree` 字段把关。**
+
+### 新增：mcp-server（租约账本）
+
+- **`lease_acquire` / `lease_renew` / `lease_release` / `lease_list` MCP
+  工具（第 22-25 个）**：跨进程租约账本，给并行的 agent 会话共享"意图"。
+  每条租约是 `~/.llama-mm/leases.d/` 下一个 JSON 文件（无锁：写者只创建或
+  改写自己创建的文件，并发 MCP 进程——每个会话一个——不会丢失更新）。
+  租约记录 holder、档位/端口/GPU 池、优先级（production > interactive >
+  cron）、TTL（默认 900s 对齐 `--sleep-idle-seconds`）与用途。TTL 过期或
+  持有进程退出（PID + 创建时间双校验，防 PID 复用）自动失效，读取时顺带
+  清理。活跃租约挡住同池的 `stop_profile` / `switch_profile`，冲突返回
+  结构化清单（谁占着、占什么）；`force=true` 越过（人来裁决）。
+  `chat` / `complete` / `bench` 命中本会话自己的租约时顺带续期（工具调用
+  续约，无后台心跳）。CLI 脚本直接 import 本模块，给长 TTL（如 14400s）
+  并以自身进程作持有者。
+
+### 修复：显存记账盲区
+
+- **预算检查不再对平面外占用失明**：旧实现里预算的"已用"几乎恒为零——
+  (a) 进程扫描只认 `-m`，手起实例（写 `--model`）全部隐身；(b) `/metrics`
+  实测显存只用于展示、从不进池账；(c) rocm-smi 兜底读的是工具根本不输出的
+  `Used` 键。现在：`find_servers` 同时识别 `-m` 与 `--model`；`/metrics`
+  实测优先进池账（档位声明权重只作兜底）；单池配置下以 nvidia-smi（优先）
+  或 rocm-smi（60s 缓存）的整机实测作下限（`smi_floor`），桌面、ComfyUI
+  类进程也计入预算。config 新增 `nvidia_smi_path`（默认从 PATH 自动发现）
+  与 `leases_dir`；快照新增 `smi_total_gb` 字段。
+- `router_models` 文档字符串补 `sleeping` 状态语义：llama.cpp router
+  （b545-c479922）经 `/models` 原生上报该状态（已实测），无需客户端翻译，
+  此前"sleeping 被标成 loaded"的结论有误。
+
+### 派发试点（仅设计）
+
+- **`docs/DISPATCH-PILOT.zh.md`** 定稿"把 decide 原语抬到路由位（选模型 /
+  工具 / 动作）"的设计：RSI 式运行闭环标注（用户接管、重试、打回、验收
+  结果即标定信号，无需人工语料）；决策层资源双路线（默认 QJev 走 CPU 或
+  按需加载，兜底换第三方 4B-9B 兼容决策模型，不重训）；P0-P3 分阶段门槛
+  （qc_tiel 先行、galtransl 随后）；随试点一并立项 `POST /v1/decisions`
+  OpenAI Decisions 兼容端点（派发器自己是第一个消费方）。ROADMAP v0.3+
+  已挂条目，实施以试点链路开工为触发条件。背景调研见
+  `docs/research/2026-10-07-openai-decisions-api.md`。
 
 ## v0.2.0 — 2026-09-19
 

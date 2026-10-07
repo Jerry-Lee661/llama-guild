@@ -28,6 +28,20 @@ All notable changes are documented here. Dates are 2026, UTC+8.
 - `chat` gains `logprobs` / `top_logprobs` (OpenAI-compatible fields); the
   streaming chunk parser was extracted as `_consume_chunk` (pure, unit-tested).
 - `complete` now surfaces `completion_probabilities` when requested.
+- **`lease_acquire` / `lease_renew` / `lease_release` / `lease_list` MCP
+  tools** (22nd–25th): a cross-process lease ledger for parallel agent
+  sessions. One JSON file per lease under `~/.llama-mm/leases.d/` (lock-free:
+  writers only ever create/replace their own file, so concurrent MCP server
+  processes — one per session — cannot lose updates). A lease records intent
+  (holder, profile/port/device, priority `production > interactive > cron`,
+  TTL default 900s aligned with `--sleep-idle-seconds`, purpose). TTL expiry
+  or holder-PID death (PID + create-time, guards against PID reuse)
+  auto-invalidates and is cleaned on read. Active leases block
+  `stop_profile` / `switch_profile` on the same pool with a structured
+  conflict listing who holds what; `force=true` overrides (human decision).
+  `chat` / `complete` / `bench` touching the session's own lease renew it in
+  passing (tool-call renewal; no background heartbeat). CLI scripts import
+  the module directly and pass a long TTL (e.g. 14400s) with their own pid.
 
 > Verified live: mechanics against local instances (swap-averaging, escalation);
 > production integration on the QJev v14_s0 System One engine passed the full
@@ -102,6 +116,21 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   regression on the product profile); rollback = v16a3_s1 adapter + drop the
   render key. Known new signal, reported to the GP side: the probe's fewshot
   condition collapses to all-deny on v18m (-72.1 pp).
+- **High-throughput serving for the judgment layer: `--cache-reuse` is the
+  deterministic cross-slot prefix switch** (GP-side parallel measurement,
+  X99, 0.8B Q8, parallel 8 + kv-unified). Without it, same-state requests
+  full-prefill in every slot; with `--kv-unified --cache-reuse 64` the first
+  request prefills (~1,979 tokens, 9.0 s on CPU) and later same-state
+  requests process only ~500 tokens (74% saved, server-side KV keep ratio
+  0.977), 2.4 s per question. `--kv-unified` is mandatory: without it `-c`
+  is split per slot and long states blow the context. Serving recipe queued
+  for the next engine window on 8280: `--parallel 8 --kv-unified
+  --cache-reuse 64`; dispatcher = state warmup then per-question fanout,
+  with decide_batch enjoying the first-request warmup effect naturally once
+  cache-reuse is on. Equivalence, determinism and anti-injection hold by
+  construction at request granularity, so the packed-forward path ships as
+  an experimental feature only.
+  Docs: [REFLEX-USE.zh.md](docs/REFLEX-USE.zh.md) (concurrent-slot section).
 - **`workflow-mm` skill (5th skill, now in `skills/`)**: a harness-agnostic
   contract workflow that wraps the contract-dispatch-accept skeleton into one
   skill for any agent tool: per-run model choice (session model / local
@@ -116,6 +145,22 @@ All notable changes are documented here. Dates are 2026, UTC+8.
 
 ### Fixed
 
+- **VRAM budget accounting no longer blind to out-of-plane consumers**: the
+  budget check's "used" was effectively always zero because (a) process
+  scanning parsed only `-m`, so hand-launched servers (which use `--model`)
+  were invisible; (b) `/metrics` measured VRAM was display-only and never
+  fed pool totals; (c) the rocm-smi fallback read a `Used` key the tool
+  never emits. Now: `find_servers` parses both `-m` and `--model`;
+  `/metrics` measurements feed pool accounting with profile weight only as
+  fallback; a whole-machine floor is taken from nvidia-smi (preferred) or
+  rocm-smi (60s cache) into the single configured pool as `smi_floor`, so
+  desktop / ComfyUI-class consumers count against the budget. Config gains
+  `nvidia_smi_path` (auto-detected from PATH) and `leases_dir`; the
+  snapshot reports `smi_total_gb`.
+- `router_models` docstring documents the `sleeping` state: the llama.cpp
+  router (b545-c479922) reports it natively via `/models` (verified live),
+  so no client-side translation was needed — the earlier "sleeping shown as
+  loaded" conclusion was wrong.
 - **`remote_host` profile key now parsed** (alias of `host`): three x99
   profiles written with `remote_host` were silently resolving to
   `http://127.0.0.1:8080` instead of the LAN router
@@ -141,6 +186,21 @@ All notable changes are documented here. Dates are 2026, UTC+8.
   flag. Unloaded models stay heuristic-only with 10% headroom and never hit
   `/tokenize` (which would trigger autoload on the x99 router). Regression:
   `2x-tiel-q6-262k-n2`: args-derived 131072 wins over meta's 262144.
+
+### Dispatch pilot (design only)
+
+- **`docs/DISPATCH-PILOT.zh.md`** locks the design for lifting the decide
+  primitive to the routing seat (choose model / tool / action): RSI-style
+  in-loop labeling (user takeovers, retries, output rejections and
+  acceptance outcomes are the calibration signal — no manual corpus),
+  dual resource route for the decision layer (QJev-on-CPU or on-demand
+  load by default; a third-party 4B-9B decisions-compatible model as the
+  fallback; no retraining), staged gates P0-P3 (qc_tiel first, galtransl
+  second), and a `POST /v1/decisions` OpenAI Decisions-compatible endpoint
+  to be built alongside the pilot (the dispatcher itself is the first
+  consumer). ROADMAP v0.3+ carries the entry; implementation is gated on
+  the pilot link starting. Background research:
+  `docs/research/2026-10-07-openai-decisions-api.md`.
 
 ## v0.2.0 — 2026-09-19
 

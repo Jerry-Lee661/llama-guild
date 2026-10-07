@@ -53,7 +53,7 @@ magnitude cheaper, with tool-enforced acceptance so quality doesn't slip.
                     ┌──────────────────────────────┐
                     │     llama-multimodel-mcp     │  model profiles, lifecycle,
                     │                              │  inference, context checks,
-                    └──────────────┬───────────────┘  usage stats
+                    └──────────────┬───────────────┘  leases, usage stats
                      ┌─────────────┴────────────┐
                      ▼                          ▼
           llama.cpp llama-server       any OpenAI-compatible endpoint
@@ -77,7 +77,7 @@ lets the local model drift off-contract unreviewed.
 | Workflow discipline | `planner` / `orchestrator` / `local-executor` / `setup` skills named after their roles; **wide mode** routes contract-free mechanical chores (organizing, extraction, rewriting) to the local model too, by type whitelist |
 | Executor safety | **Confidence gate** before any prompt is built: blocking gaps come back as `NEEDS_CONTEXT`, not forced code; **consult-and-record loop** folds a cloud diagnosis into the retry after repeated local failures and records working fixes in `.guild/lessons.md` |
 | Atomic decisions | **`decide`** turns bounded yes-no / K-choice / score questions into GBNF constrained decoding (single-token letter grammar): per-option probabilities + Jev confidence, two passes with swapped option order to cancel position bias; probabilities are uncalibrated ranking signals, so consumers gate on `pass_choices` / `agree`. A `llama-decide` CLI covers hooks that cannot call MCP |
-| Economics & safety | **Context preflight** (exact tokenization on llama.cpp, heuristic elsewhere) with structured `context_exceeded` errors; VRAM pools; hard switch to remove the skills from agent context entirely |
+| Economics & safety | **Context preflight** (exact tokenization on llama.cpp, heuristic elsewhere) with structured `context_exceeded` errors; VRAM accounting measured-first (`/metrics`, plus an nvidia-smi/rocm-smi machine floor) with per-GPU pools; **lease ledger** (`lease_acquire`/`renew`/`release`/`list`): parallel sessions register intent, TTL + holder-liveness expiry, auto-renewed on tool calls, active leases block conflicting stop/switch unless forced; hard switch to remove the skills from agent context entirely |
 | Observability | `chat`/`complete` with TTFT & speculative-decode acceptance, per-token `logprobs` on `chat`; `bench` (speed / ttft / prefill / longctx); `usage_stats`, local-only |
 
 ### The Jev decision layer
@@ -105,7 +105,10 @@ instead of the cloud model.
   job-portal homepages (Liepin, Guopin, Nowcoder, Yingjiesheng) picked the
   correct next action at 0.9985-0.9989 confidence in 165-569 ms per step; the
   hardened adapter (v16a2) closes the forged-options-block gap from -47.7 pp
-  to +1.2 pp.
+  to +1.2 pp; the production endpoint now runs the sysone2 state-first render
+  (v18m), which unlocks **prefix-cache sharing**: with `--parallel 8
+  --kv-unified --cache-reuse 64`, later same-state requests skip 74% of
+  prefill (dispatcher = one state warmup, then fan out per question).
 
 ### workflow-mm: the workflow as one skill
 

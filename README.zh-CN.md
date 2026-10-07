@@ -43,7 +43,7 @@ English documentation: **[README.md](README.md)**
                                    ▼
                     ┌──────────────────────────────┐
                     │     llama-multimodel-mcp     │  模型档位与生命周期
-                    │                              │  推理 · 上下文检查 · 用量统计
+                    │                              │  推理 · 上下文检查 · 租约 · 用量统计
                     └──────────────┬───────────────┘
                      ┌─────────────┴────────────┐
                      ▼                          ▼
@@ -66,7 +66,7 @@ VS Code、DSH、pi、omp、opencode。本地模型连不上时流程自动降级
 | 流程分工 | `planner` / `orchestrator` / `local-executor` / `setup` 四个 skill 各管一个角色；没有契约的简单杂务（整理资料、提取信息、改写文字）也按类型清单派给本地模型 |
 | 执行保障 | 动手前先自评把握，关键信息缺失就上报 `NEEDS_CONTEXT`，不硬写；本地模型反复失败时向云端要一次诊断，带着建议做最后一次尝试；有效的解法记进 `.guild/lessons.md`，同一个坑不踩第二次 |
 | 原子判定 | `decide` 把"是/否、多选一、打分"这类封闭判定交给本地模型：GBNF 约束解码限定单 token 作答，返回各选项概率和置信度；把选项顺序对调再测一遍取平均，消除顺序偏差；概率未经校准，只作排序参考，调用方用 `pass_choices`/`agree` 字段把关。另配 `llama-decide` CLI，给调不了 MCP 的 hook 用 |
-| 成本与防护 | 发送前检查上下文长度（llama.cpp 按 token 精确计算，其他后端估算），超限返回 `context_exceeded` 错误；显存按显卡分池管控；不想用这套流程时，一个脚本就能把 skill 整体关掉 |
+| 成本与防护 | 发送前检查上下文长度（llama.cpp 按 token 精确计算，其他后端估算），超限返回 `context_exceeded` 错误；显存实测优先入账（`/metrics` 加 nvidia-smi/rocm-smi 整机兜底），按显卡分池管控；跨进程租约账本（`lease_acquire`/`renew`/`release`/`list`）让并行会话登记意图：TTL 加持有进程存活校验，工具调用顺带续期，活跃租约挡住冲突的停机与切换（force 可越过）；不想用这套流程时，一个脚本就能把 skill 整体关掉 |
 | 运行指标 | `chat`/`complete` 返回首字延迟和投机解码接受率，`chat` 还可返回逐 token 概率（logprobs）；`bench` 支持速度 / 首字延迟 / 预填充 / 长上下文四种测试；`usage_stats` 查看 token 用量，仅存本地 |
 
 ## Jev 判定层
@@ -85,7 +85,10 @@ VS Code、DSH、pi、omp、opencode。本地模型连不上时流程自动降级
   预期动作（`rm -rf ~` 拒、`git status` 放行、`curl | sh` 拒等）；对四个真实
   招聘网站首页（猎聘、国聘、牛客、应届生）做浏览器动作打分，每步都选中正确
   动作，置信度 0.9985-0.9989，单步 165-569ms；加固适配器（v16a2）把伪造选项
-  块攻击的掉分从 -47.7pp 收到 +1.2pp。
+  块攻击的掉分从 -47.7pp 收到 +1.2pp；产品端点现运行 sysone2 state 前置渲染
+  （v18m），由此解锁**前缀缓存共享**：`--parallel 8 --kv-unified
+  --cache-reuse 64` 下，同 state 后续请求跳过 74% 预填充（dispatcher 模式 =
+  一条 state 预热，再按题扇出）。
 
 ## workflow-mm：把工作流装进一个 skill
 
