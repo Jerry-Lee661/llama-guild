@@ -1,5 +1,8 @@
 # llama-guild
 
+[English](README.md) | **简体中文**
+
+[![ci](https://github.com/Jerry-Lee661/llama-guild/actions/workflows/ci.yml/badge.svg)](https://github.com/Jerry-Lee661/llama-guild/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](mcp-server/pyproject.toml)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-orange.svg)](#provider-与平台)
@@ -11,7 +14,18 @@ llama-guild 把编码 agent 的工作分成两半：云端强模型出一份任�
 怎么验证，做完后负责检查；写代码交给便宜的**本地大模型**
 （llama.cpp / LM Studio / Ollama）。成本降到约十分之一，质量由验收流程把关。
 
-English documentation: **[README.md](README.md)**
+## 数字速览
+
+| 维度 | 事实 |
+|---|---|
+| MCP 工具 | **25 个**（CI 断言工具总数，静默增减直接挂构建）：档位与状态、生命周期（启停/切换）、router 热切换、跨进程租约、推理与调试、判定、用量统计与局域网发现 |
+| Skill | 6 个：`planner` / `orchestrator` / `local-executor` / `setup` / `workflow-mm` / `reflex-use` |
+| 命令行入口 | 4 个：`llama-multimodel-mcp`、`llama-decide`、`llama-decide-bench`、`llama-decide-batch` |
+| 支持的 agent 宿主 | 8 个：ZCode、Claude Code、Codex、VS Code、DSH、pi、omp、opencode（[接入方式](#支持的-agent-工具)） |
+| 后端 | llama.cpp `llama-server`（全功能）；OpenAI 兼容：LM Studio、Ollama、vLLM、llama-swap |
+| 实测模型 | 模型不限，任意 GGUF 或兼容端点皆可；已实测 Qwen3.8-27B（quality 档）、Qwen3.6-35B-A3B（bulk 档）、Qwen3.5-9B；判定引擎 QJev 3.5-0.8B（约 1GB 显存） |
+| 基准测试 | 24GB 单卡实测：27B dense 46-62 t/s，35B MoE 120-140 t/s（短上下文约 205 t/s）；`bench` 四种模式可复现，见[参考基线](docs/BENCHMARKS.zh.md) |
+| 公开与许可 | MIT，2026-09-03 起公开；CI 在 Windows / Linux 与 Python 3.10 / 3.12 上跑离线测试与 stdio 冒烟（含工具数断言）；无遥测 |
 
 ## 它做什么
 

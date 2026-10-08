@@ -1,5 +1,8 @@
 # llama-guild
 
+**English** | [简体中文](README.zh-CN.md)
+
+[![ci](https://github.com/Jerry-Lee661/llama-guild/actions/workflows/ci.yml/badge.svg)](https://github.com/Jerry-Lee661/llama-guild/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](mcp-server/pyproject.toml)
 [![platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-orange.svg)](#providers)
@@ -12,7 +15,18 @@ model writes the **contract** and accepts the result, while a cheap **local
 model** (llama.cpp / LM Studio / Ollama) does the actual coding: an order of
 magnitude cheaper, with tool-enforced acceptance so quality doesn't slip.
 
-简体中文文档：**[README.zh-CN.md](README.zh-CN.md)**
+## At a glance
+
+| Dimension | Fact |
+|---|---|
+| MCP tools | **25** (CI asserts the exact count, so silent additions or removals fail the build): profiles & status, lifecycle, router hot-swap, cross-process leases, inference & debugging, decisions, usage stats & LAN discovery |
+| Skills | 6: `planner` / `orchestrator` / `local-executor` / `setup` / `workflow-mm` / `reflex-use` |
+| CLI entry points | 4: `llama-multimodel-mcp`, `llama-decide`, `llama-decide-bench`, `llama-decide-batch` |
+| Agent hosts | 8: ZCode, Claude Code, Codex, VS Code, DSH, pi, omp, opencode ([how to wire them up](#supported-tools)) |
+| Backends | llama.cpp `llama-server` (full feature set); OpenAI-compatible: LM Studio, Ollama, vLLM, llama-swap |
+| Models exercised | model-agnostic, any GGUF or compatible endpoint works; measured so far: Qwen3.8-27B (quality tier), Qwen3.6-35B-A3B (bulk tier), Qwen3.5-9B; decision engine QJev 3.5-0.8B (~1 GB VRAM) |
+| Benchmarks | on a single 24 GB GPU: 27B dense at 46-62 t/s, 35B MoE at 120-140 t/s (about 205 t/s on short context); four `bench` modes reproduce these, see [reference baselines](docs/BENCHMARKS.zh.md) |
+| Public & license | MIT, public since 2026-09-03; CI runs the offline tests plus a stdio smoke test (tool-count assertion included) on Windows / Linux and Python 3.10 / 3.12; no telemetry |
 
 ## What it does
 

@@ -1,8 +1,9 @@
 # llama-multimodel-mcp
 
-MCP server that exposes local model profiles, lifecycle management (llama-server),
-inference debugging (TTFT / tps / speculative-decoding telemetry) and local-only
-token usage stats to coding agents.
+MCP server exposing **25 tools** to coding agents: local model profiles,
+lifecycle management (llama-server), router hot-swap, cross-process leases,
+inference debugging (TTFT / tps / speculative-decoding telemetry), decisions,
+and local-only token usage stats.
 
 See the repository root README for the full picture. Quick start:
 
